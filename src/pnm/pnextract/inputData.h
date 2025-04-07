@@ -98,6 +98,7 @@ inline int createSample_input_nextract(std::string fnam, std::string opts)
 class inputDataNE : public InputFile
 {
 public:
+	inputDataNE() = default;
 	inputDataNE(const std::string &fnam)
 		: InputFile(fnam, false), nx(0), ny(0), nz(0), vxlSize(1), X0(0., 0., 0.), invalidSeg{-10000, 255, 0}
 	{
