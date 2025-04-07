@@ -85,7 +85,7 @@ public:
     voxelImageT_PYPNE() = default;
     void setData(std::vector<T> &data)
     {
-        voxelImageT<T>::data_ = data;
+        voxelImageT<T>::data_ = std::move(data);
     }
     void setNnn(int3 nnn)
     {
@@ -110,7 +110,7 @@ public:
         this->ny = ny;
         this->nz = nz;
         this->vxlSize = resolution;
-        this->VImage = vm;
+        this->VImage = std::move(vm);
         this->X0 = {0., 0., 0.};
         this->invalidSeg = {-10000, 255, 0};
         this->_rockTypes.push_back(poroRange("void", 0, 0));
