@@ -111,7 +111,7 @@ unsigned int growPores_X2(voxelField<int> &VElems, int bgn, int lst, int porValu
 			for (int j = voxls.ny() - 2; j >= 1; --j)
 				for (int i = voxls.nx() - 2; i >= 1; --i)
 				{
-					const int *pijk = &VElems(i, j, k);
+					const int *pijk = &voxls(i, j, k);
 					if (*pijk == porValue)
 					{
 						if (bgn <= voxls.v_i(1, pijk) && voxls.v_i(1, pijk) <= lst)
