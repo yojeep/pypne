@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pypne"
-version = "0.0.8"
+version = "0.0.9"
 requires-python = ">=3.8"
 
 [tool.scikit-build]
