@@ -23,25 +23,37 @@ vec_str_pair convert_dict(py::dict py_dict)
     return result;
 }
 
+// template <typename T>
+// py::array_t<T> vector_to_numpy(const std::vector<T> &vec)
+// {
+//     py::array_t<T> arr(vec.size());
+//     auto buf = arr.request();
+//     T *ptr = static_cast<T *>(buf.ptr);
+//     std::copy(vec.begin(), vec.end(), ptr);
+//     return arr;
+// }
+
+
 template <typename T>
-py::array_t<T> vector_to_numpy(const std::vector<T> &vec)
-{
-    py::array_t<T> arr(vec.size());
-    auto buf = arr.request();
-    T *ptr = static_cast<T *>(buf.ptr);
-    std::copy(vec.begin(), vec.end(), ptr);
-    return arr;
+py::array_t<T> vector_to_numpy(const std::vector<T> &vec) {
+    return py::array_t<T>(
+        {vec.size()},  // shape
+        {sizeof(T)},   // stride
+        vec.data()     // 直接使用 vector 的内存
+    );
 }
 
 auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsigned char> arr, py::dict config_dict)
 {
     auto buf = arr.request();
     std::vector<unsigned char> data(arr.size());
-    auto arr_uncheck = arr.unchecked<1>();
-    for (py::ssize_t i = 0; i < arr.size(); i++)
-    {
-        data[i] = arr_uncheck(i);
-    }
+    // auto arr_uncheck = arr.unchecked<1>();
+    // for (py::ssize_t i = 0; i < arr.size(); i++)
+    // {
+    //     data[i] = arr_uncheck(i);
+    // }
+
+    std::memcpy(data.data(), buf.ptr, arr.size() * sizeof(unsigned char));
 
     voxelImageT_PYPNE<unsigned char> vm;
     vm.setData(data);
