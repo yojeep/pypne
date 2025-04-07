@@ -96,29 +96,67 @@ public:
 			delete[] neis;
 	}
 
+	// short level() const
+	// {
+	// 	if (this == boss)
+	// 		return 1;
+	// 	else
+	// 		return boss->level() + 1;
+	// }
 	short level() const
 	{
-		if (this == boss)
-			return 1;
-		else
-			return boss->level() + 1;
+		const medialBall *current = this;
+		short count = 1;
+
+		while (current != current->boss)
+		{
+			current = current->boss;
+			++count;
+		}
+
+		return count;
 	}
+	// bool inParents(medialBall *vj) const
+	// {
+	// 	if (vj == boss)
+	// 		return true;
+	// 	else if (boss == this)
+	// 		return false;
+	// 	else
+	// 		return boss->inParents(vj);
+	// }
 	bool inParents(medialBall *vj) const
 	{
-		if (vj == boss)
-			return true;
-		else if (boss == this)
-			return false;
-		else
-			return boss->inParents(vj);
-	}
+		const medialBall *current = this;
 
+		while (current != current->boss)
+		{
+			if (current->boss == vj)
+			{
+				return true;
+			}
+			current = current->boss;
+		}
+
+		return false;
+	}
+	// medialBall *mastrSphere() const
+	// {
+	// 	if (this == boss)
+	// 		return boss;
+	// 	else
+	// 		return boss->mastrSphere();
+	// }
 	medialBall *mastrSphere() const
 	{
-		if (this == boss)
-			return boss;
-		else
-			return boss->mastrSphere();
+		medialBall *current = const_cast<medialBall *>(this);
+
+		while (current != current->boss)
+		{
+			current = current->boss;
+		}
+
+		return current;
 	}
 
 	// inline const medialBall* smallestP() const
