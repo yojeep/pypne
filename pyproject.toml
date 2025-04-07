@@ -1,0 +1,25 @@
+[build-system]
+requires = ["scikit-build-core","pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pypne"
+version = "0.0.7"
+requires-python = ">=3.8"
+
+[tool.scikit-build]
+cmake.source-dir = "."
+cmake.args = ["-G", "Ninja"]
+cmake.build-type = "Release"
+
+[tool.cibuildwheel.linux]
+archs = ["auto64"]
+#
+#[tool.cibuildwheel.macos]
+#archs = ["auto64"]
+#
+[tool.cibuildwheel.windows]
+archs = ["auto64"]
+
+#environment = { PIP_CONFIG_SETTINGS="build_ext -j4" }
+
