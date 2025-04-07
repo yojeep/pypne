@@ -1,10 +1,10 @@
 [build-system]
-requires = ["scikit-build-core","pybind11"]
+requires = ["scikit-build-core","pybind11","ninja"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pypne"
-version = "0.0.7"
+version = "0.0.8"
 requires-python = ">=3.8"
 
 [tool.scikit-build]
