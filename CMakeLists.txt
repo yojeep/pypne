@@ -25,7 +25,7 @@ target_include_directories(pypne_cpp PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${C
 if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(pypne_cpp PRIVATE -O3 -Wall) #${OpenMP_CXX_FLAGS} -DOpenMP) #-DOpenMP
+    target_compile_options(pypne_cpp PRIVATE -Ofast -Wall) #${OpenMP_CXX_FLAGS} -DOpenMP) #-DOpenMP
     target_link_libraries(pypne_cpp PRIVATE -static-libstdc++ -static-libgcc)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
         CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")

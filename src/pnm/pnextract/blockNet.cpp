@@ -148,13 +148,17 @@ void blockNetwork::CreateVElem(size_t startValue)
 				float R = bi.R;
 				int r2 = std::max(R * 0.25 - 1., 1.001) * std::max(R * 0.25 - 1., 1.001);
 
-				float ex = sqrt(r2);
+				float ex = std::sqrt(r2);
 				for (float xpa = max((x - ex), 0.5f); xpa <= min((x + ex), cg.nx - 0.5f); xpa += 1.0f)
 				{
-					float ey = sqrt(r2 - (xpa - x) * (xpa - x));
+					float ey = std::sqrt(r2 - (xpa - x) * (xpa - x));
+					if (std::isnan(ey))
+						continue;
 					for (float ypb = max((y - ey), 0.5f); ypb <= min((y + ey), cg.ny - 0.5f); ypb += 1.0f)
 					{
-						float ez = sqrt(r2 - (xpa - x) * (xpa - x) - (ypb - y) * (ypb - y));
+						float ez = std::sqrt(r2 - (xpa - x) * (xpa - x) - (ypb - y) * (ypb - y));
+						if (std::isnan(ez))
+							continue;
 						for (float zpc = max((z - ez), 0.5f); zpc <= min((z + ez), cg.nz - 0.5f); zpc += 1.0f)
 						{
 							int idj = VElems(xpa + 1, ypb + 1, zpc + 1);

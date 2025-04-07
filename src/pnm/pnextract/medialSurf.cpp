@@ -238,9 +238,13 @@ void medialSurface::paradoxremoveincludedballI()
 		for (int a = -ex; a <= ex; ++a)
 		{
 			ey = std::sqrt(ripinc * ripinc - a * a);
+			if (std::isnan(ey))
+				continue;
 			for (int b = -ey; b <= ey; ++b)
 			{
 				ez = sqrt(ripinc * ripinc - a * a - b * b); // sqrts(r2i)+1-a-b;
+				if (std::isnan(ez))
+					continue;
 				for (int c = -ez; c <= ez; ++c)
 				{
 					voxel *vj = vxl(x + a, y + b, z + c);
