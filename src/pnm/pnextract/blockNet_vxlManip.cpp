@@ -10,139 +10,145 @@ using namespace std; // std::pair, vector map
 
 unsigned int growPores_X2(voxelField<int> &VElems, int bgn, int lst, int porValue)
 {
-	voxelField<int> voxls = VElems;
+
 	long long nChanges(0);
-
-	OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < int(voxls.nz()) - 1; ++k)
 	{
-		for (int j = 1; j < int(voxls.ny()) - 1; ++j)
-			for (int i = 1; i < int(voxls.nx()) - 1; ++i)
-			{
-				const int *pijk = &voxls(i, j, k);
-				if (*pijk == porValue)
+		voxelField<int> voxls = VElems;
+		OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < int(voxls.nz()) - 1; ++k)
+		{
+			for (int j = 1; j < int(voxls.ny()) - 1; ++j)
+				for (int i = 1; i < int(voxls.nx()) - 1; ++i)
 				{
-					if (bgn <= voxls.v_i(1, pijk) && voxls.v_i(1, pijk) <= lst)
+					const int *pijk = &voxls(i, j, k);
+					if (*pijk == porValue)
 					{
-						VElems(i, j, k) = voxls.v_i(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= voxls.v_i(-1, pijk) && voxls.v_i(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = voxls.v_i(-1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= voxls.v_j(1, pijk) && voxls.v_j(1, pijk) <= lst)
-					{
-						VElems(i, j, k) = voxls.v_j(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= voxls.v_j(-1, pijk) && voxls.v_j(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = voxls.v_j(-1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= voxls.v_k(1, pijk) && voxls.v_k(1, pijk) <= lst)
-					{
-						VElems(i, j, k) = voxls.v_k(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= voxls.v_k(-1, pijk) && voxls.v_k(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = voxls.v_k(-1, pijk);
-						++nChanges;
+						if (bgn <= voxls.v_i(1, pijk) && voxls.v_i(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_i(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_i(-1, pijk) && voxls.v_i(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_i(-1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_j(1, pijk) && voxls.v_j(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_j(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_j(-1, pijk) && voxls.v_j(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_j(-1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_k(1, pijk) && voxls.v_k(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_k(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_k(-1, pijk) && voxls.v_k(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_k(-1, pijk);
+							++nChanges;
+						}
 					}
 				}
-			}
+		}
+		cout << "  ngrowX3:" << nChanges << ",";
 	}
-	cout << "  ngrowX3:" << nChanges << ",";
 	nChanges = 0;
-
-	OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < VElems.nz() - 1; ++k)
 	{
-		for (int j = 1; j < VElems.ny() - 1; ++j)
-			for (int i = 1; i < VElems.nx() - 1; ++i)
-			{
-				const int *pijk = &VElems(i, j, k);
-				if (*pijk == porValue)
+		voxelField<int> voxls = VElems;
+		OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < voxls.nz() - 1; ++k)
+		{
+			for (int j = 1; j < voxls.ny() - 1; ++j)
+				for (int i = 1; i < voxls.nx() - 1; ++i)
 				{
-					if (bgn <= VElems.v_i(1, pijk) && VElems.v_i(1, pijk) <= lst)
+					const int *pijk = &voxls(i, j, k);
+					if (*pijk == porValue)
 					{
-						VElems(i, j, k) = VElems.v_i(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_i(-1, pijk) && VElems.v_i(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_i(-1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_j(1, pijk) && VElems.v_j(1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_j(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_j(-1, pijk) && VElems.v_j(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_j(-1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_k(1, pijk) && VElems.v_k(1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_k(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_k(-1, pijk) && VElems.v_k(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_k(-1, pijk);
-						++nChanges;
+						if (bgn <= voxls.v_i(1, pijk) && voxls.v_i(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_i(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_i(-1, pijk) && voxls.v_i(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_i(-1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_j(1, pijk) && voxls.v_j(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_j(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_j(-1, pijk) && voxls.v_j(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_j(-1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_k(1, pijk) && voxls.v_k(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_k(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_k(-1, pijk) && voxls.v_k(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_k(-1, pijk);
+							++nChanges;
+						}
 					}
 				}
-			}
+		}
+		cout << nChanges << ",";
 	}
-	cout << nChanges << ",";
 	nChanges = 0;
-
-	OMPragma("omp parallel for reduction(+:nChanges)") for (int k = VElems.nz() - 2; k >= 1; --k)
 	{
-		for (int j = VElems.ny() - 2; j >= 1; --j)
-			for (int i = VElems.nx() - 2; i >= 1; --i)
-			{
-				const int *pijk = &VElems(i, j, k);
-				if (*pijk == porValue)
+		voxelField<int> voxls = VElems;
+		OMPragma("omp parallel for reduction(+:nChanges)") for (int k = voxls.nz() - 2; k >= 1; --k)
+		{
+			for (int j = voxls.ny() - 2; j >= 1; --j)
+				for (int i = voxls.nx() - 2; i >= 1; --i)
 				{
-					if (bgn <= VElems.v_i(1, pijk) && VElems.v_i(1, pijk) <= lst)
+					const int *pijk = &VElems(i, j, k);
+					if (*pijk == porValue)
 					{
-						VElems(i, j, k) = VElems.v_i(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_i(-1, pijk) && VElems.v_i(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_i(-1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_j(1, pijk) && VElems.v_j(1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_j(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_j(-1, pijk) && VElems.v_j(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_j(-1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_k(1, pijk) && VElems.v_k(1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_k(1, pijk);
-						++nChanges;
-					}
-					else if (bgn <= VElems.v_k(-1, pijk) && VElems.v_k(-1, pijk) <= lst)
-					{
-						VElems(i, j, k) = VElems.v_k(-1, pijk);
-						++nChanges;
+						if (bgn <= voxls.v_i(1, pijk) && voxls.v_i(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_i(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_i(-1, pijk) && voxls.v_i(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_i(-1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_j(1, pijk) && voxls.v_j(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_j(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_j(-1, pijk) && voxls.v_j(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_j(-1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_k(1, pijk) && voxls.v_k(1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_k(1, pijk);
+							++nChanges;
+						}
+						else if (bgn <= voxls.v_k(-1, pijk) && voxls.v_k(-1, pijk) <= lst)
+						{
+							VElems(i, j, k) = voxls.v_k(-1, pijk);
+							++nChanges;
+						}
 					}
 				}
-			}
+		}
+		cout << "  ngrowX2:" << nChanges << "  ";
 	}
-	cout << "  ngrowX2:" << nChanges << "  ";
 	return nChanges;
 }
 
