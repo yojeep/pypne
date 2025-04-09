@@ -33,13 +33,13 @@ vec_str_pair convert_dict(py::dict py_dict)
 //     return arr;
 // }
 
-
 template <typename T>
-py::array_t<T> vector_to_numpy(const std::vector<T> &vec) {
+py::array_t<T> vector_to_numpy(const std::vector<T> &vec)
+{
     return py::array_t<T>(
-        {vec.size()},  // shape
-        {sizeof(T)},   // stride
-        vec.data()     // 直接使用 vector 的内存
+        {vec.size()}, // shape
+        {sizeof(T)},  // stride
+        vec.data()    // 直接使用 vector 的内存
     );
 }
 
@@ -125,26 +125,29 @@ auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsign
     cout << "end" << endl;
 
     auto VElems = mpn.VElems.data_;
-    auto pypnedata = compute_PYPNEData(mpn);
     py::array_t<int> py_VElems = vector_to_numpy<int>(VElems);
-    py::dict pn("pore._id"_a = vector_to_numpy<int>(pypnedata.pore.pore_index),
-                "pore.x"_a = vector_to_numpy<float>(pypnedata.pore.pore_x),
-                "pore.y"_a = vector_to_numpy<float>(pypnedata.pore.pore_y),
-                "pore.z"_a = vector_to_numpy<float>(pypnedata.pore.pore_z),
-                "pore.connection_number"_a = vector_to_numpy<int>(pypnedata.pore.pore_connection_number),
-                "pore.volume"_a = vector_to_numpy<float>(pypnedata.pore.pore_volume),
-                "pore.radius"_a = vector_to_numpy<float>(pypnedata.pore.pore_radius),
-                "pore.shape_factor"_a = vector_to_numpy<float>(pypnedata.pore.pore_shape_factor),
-                "throat._id"_a = vector_to_numpy<int>(pypnedata.throat.throat_index),
-                "throat.pore_1_index"_a = vector_to_numpy<int>(pypnedata.throat.throat_pore1_index),
-                "throat.pore_2_index"_a = vector_to_numpy<int>(pypnedata.throat.throat_pore2_index),
-                "throat.radius"_a = vector_to_numpy<float>(pypnedata.throat.throat_radius),
-                "throat.shape_factor"_a = vector_to_numpy<float>(pypnedata.throat.throat_shape_factor),
-                "throat.total_length"_a = vector_to_numpy<float>(pypnedata.throat.throat_total_length),
-                "throat.conduit_lengths_pore1"_a = vector_to_numpy<float>(pypnedata.throat.throat_pore1_length),
-                "throat.conduit_lengths_pore2"_a = vector_to_numpy<float>(pypnedata.throat.throat_pore2_length),
-                "throat.length"_a = vector_to_numpy<float>(pypnedata.throat.throat_length),
-                "throat.volume"_a = vector_to_numpy<float>(pypnedata.throat.throat_volume));
+    // auto pypnedata = compute_PYPNEData_vector(mpn);
+    // py::dict pn("pore._id"_a = vector_to_numpy<int>(pypnedata.pore.pore_index),
+    //             "pore.x"_a = vector_to_numpy<float>(pypnedata.pore.pore_x),
+    //             "pore.y"_a = vector_to_numpy<float>(pypnedata.pore.pore_y),
+    //             "pore.z"_a = vector_to_numpy<float>(pypnedata.pore.pore_z),
+    //             "pore.connection_number"_a = vector_to_numpy<int>(pypnedata.pore.pore_connection_number),
+    //             "pore.volume"_a = vector_to_numpy<float>(pypnedata.pore.pore_volume),
+    //             "pore.radius"_a = vector_to_numpy<float>(pypnedata.pore.pore_radius),
+    //             "pore.shape_factor"_a = vector_to_numpy<float>(pypnedata.pore.pore_shape_factor),
+    //             "throat._id"_a = vector_to_numpy<int>(pypnedata.throat.throat_index),
+    //             "throat.pore_1_index"_a = vector_to_numpy<int>(pypnedata.throat.throat_pore1_index),
+    //             "throat.pore_2_index"_a = vector_to_numpy<int>(pypnedata.throat.throat_pore2_index),
+    //             "throat.radius"_a = vector_to_numpy<float>(pypnedata.throat.throat_radius),
+    //             "throat.shape_factor"_a = vector_to_numpy<float>(pypnedata.throat.throat_shape_factor),
+    //             "throat.total_length"_a = vector_to_numpy<float>(pypnedata.throat.throat_total_length),
+    //             "throat.conduit_lengths_pore1"_a = vector_to_numpy<float>(pypnedata.throat.throat_pore1_length),
+    //             "throat.conduit_lengths_pore2"_a = vector_to_numpy<float>(pypnedata.throat.throat_pore2_length),
+    //             "throat.length"_a = vector_to_numpy<float>(pypnedata.throat.throat_length),
+    //             "throat.volume"_a = vector_to_numpy<float>(pypnedata.throat.throat_volume));
+
+    auto [link1, link2, node1, node2] = compute_PYPNEData_string(mpn);
+    py::dict pn("link1"_a = link1, "link2"_a = link2, "node1"_a = node1, "node2"_a = node2);
     py::dict pyres("VElems"_a = py_VElems, "pn"_a = pn);
 
     return pyres;

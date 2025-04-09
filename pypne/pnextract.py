@@ -2,6 +2,7 @@ import numpy as np
 from pathlib import Path
 import os
 import sys
+from io import StringIO
 from contextlib import contextmanager, nullcontext, redirect_stdout
 from .libcpp import pypne_cpp
 
@@ -158,6 +159,89 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False):
         )
     image_VElems = res["VElems"].reshape(nz + 2, ny + 2, nx + 2)
     pn = res["pn"]
+    link1 = pn["link1"]
+    link2 = pn["link2"]
+    node1 = pn["node1"]
+    node2 = pn["node2"]
+    link1_arr = np.genfromtxt(
+        StringIO(link1),
+        delimiter=None,
+        skip_header=1,
+        usecols=(0, 1, 2, 3, 4, 5),
+        dtype=[
+            ("throat__id", "int32"),
+            ("throat_pore_1_index", "int32"),
+            ("throat_pore_2_index", "int32"),
+            ("throat_radius", "float32"),
+            ("throat_shape_factor", "float32"),
+            ("throat_total_length", "float32"),
+        ],
+    )
+
+    link2_arr = np.genfromtxt(
+        StringIO(link2),
+        delimiter=None,
+        usecols=(0, 1, 2, 3, 4, 5, 6, 7),
+        dtype=[
+            ("throat__id", "int32"),
+            ("throat_pore_1_index", "int32"),
+            ("throat_pore_2_index", "int32"),
+            ("throat_conduit_lengths_pore1", "float32"),
+            ("throat_conduit_lengths_pore2", "float32"),
+            ("throat_length", "float32"),
+            ("throat_volume", "float32"),
+            ("throat_clay_volume", "float32"),
+        ],
+    )
+
+    node1_arr = np.genfromtxt(
+        StringIO(node1),
+        delimiter=None,
+        skip_header=1,
+        usecols=(0, 1, 2, 3, 4),
+        dtype=[
+            ("pore__id", "int32"),
+            ("pore_x", "float32"),
+            ("pore_y", "float32"),
+            ("pore_z", "float32"),
+            ("pore_connection_number", "int32"),
+        ],
+    )
+
+    node2_arr = np.genfromtxt(
+        StringIO(node2),
+        delimiter=None,
+        usecols=(0, 1, 2, 3, 4),
+        dtype=[
+            ("pore__id", "int32"),
+            ("pore_volume", "float32"),
+            ("pore_radius", "float32"),
+            ("pore_shape_factor", "float32"),
+            ("pore_clay_volume", "float32"),
+        ],
+    )
+
+    pn["pore._id"] = node1_arr["pore__id"]
+    pn["pore.x"] = node1_arr["pore_x"]
+    pn["pore.y"] = node1_arr["pore_y"]
+    pn["pore.z"] = node1_arr["pore_z"]
+    pn["pore.connection_number"] = node1_arr["pore_connection_number"]
+    pn["pore.volume"] = node2_arr["pore_volume"]
+    pn["pore.radius"] = node2_arr["pore_radius"]
+    pn["pore.shape_factor"] = node2_arr["pore_shape_factor"]
+    pn["pore.clay_volume"] = node2_arr["pore_clay_volume"]
+    pn["throat._id"] = link1_arr["throat__id"]
+    pn["throat.pore_1_index"] = link1_arr["throat_pore_1_index"]
+    pn["throat.pore_2_index"] = link1_arr["throat_pore_2_index"]
+    pn["throat.radius"] = link1_arr["throat_radius"]
+    pn["throat.shape_factor"] = link1_arr["throat_shape_factor"]
+    pn["throat.total_length"] = link1_arr["throat_total_length"]
+    pn["throat.conduit_lengths_pore1"] = link2_arr["throat_conduit_lengths_pore1"]
+    pn["throat.conduit_lengths_pore2"] = link2_arr["throat_conduit_lengths_pore2"]
+    pn["throat.length"] = link2_arr["throat_length"]
+    pn["throat.volume"] = link2_arr["throat_volume"]
+    pn["throat.clay_volume"] = link2_arr["throat_clay_volume"]
+
     if str2bool(default_config["write_elements"]):
         image_VElems.astype(np.int32, copy=False).tofile(
             default_config["output_path"] + "_VElems.raw"
