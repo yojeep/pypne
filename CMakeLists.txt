@@ -23,9 +23,9 @@ pybind11_add_module(pypne_cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/blockNet.cpp
 target_include_directories(pypne_cpp PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/libvoxel ${CMAKE_SOURCE_DIR}/pybind11/include)
 
 if(MSVC)
-    target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT /fp:fast)
+    target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(pypne_cpp PRIVATE -Ofast -Wall) #${OpenMP_CXX_FLAGS} -DOpenMP) #-DOpenMP
+    target_compile_options(pypne_cpp PRIVATE -O3 -Wall) #${OpenMP_CXX_FLAGS} -DOpenMP) #-DOpenMP
     target_link_libraries(pypne_cpp PRIVATE -static-libstdc++ -static-libgcc)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
         CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
