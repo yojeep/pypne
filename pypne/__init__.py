@@ -1,1 +1,1 @@
-from .pnextract import pnextract
+from ._pnextract import pnextract

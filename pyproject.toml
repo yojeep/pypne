@@ -4,13 +4,20 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pypne"
-version = "0.0.12"
+version = "0.0.13"
 requires-python = ">=3.8"
+
 
 [tool.scikit-build]
 cmake.source-dir = "."
 cmake.args = ["-G", "Ninja"]
 cmake.build-type = "Release"
+
+#[tool.cibuildwheel]
+#manylinux-x86_64-image = "manylinux_2_28"
+#manylinux-pypy_x86_64-image = "manylinux_2_28"
+
+
 
 [tool.cibuildwheel.linux]
 archs = ["auto64"]

@@ -1,5 +1,6 @@
 #include "inputData.h"
 #include "blockNet.h"
+// #include <format>
 
 inline double randomG() /// to randomly distribute the shape factors, in case of errors
 {
@@ -327,7 +328,7 @@ auto compute_PYPNEData_vector(blockNetwork &bn)
 
 auto compute_PYPNEData_string(blockNetwork &bn)
 {
-        /// pnflow uses the following indexes: [0:nB(=2)] for boundary nodes,
+    /// pnflow uses the following indexes: [0:nB(=2)] for boundary nodes,
     /// [nB:nP+nB] for internal nodes and throat indices start afterwards.
     /// here, in Statoil format, all these are subtracted by 1 (starting from -1).
 
@@ -483,6 +484,21 @@ auto compute_PYPNEData_string(blockNetwork &bn)
         }
         link1Content = ss.str();
     }
+    // { /// ### 生成 _link1.dat 的内容到字符串
+    //     link1Content = std::format("{:6d}\n", throatIs.size());
+    //     for (int ti = 0; ti < int(throatIs.size()); ++ti)
+    //     {
+    //         const throatNE &tr = *throatIs[ti];
+    //         link1Content += std::format(
+    //             "{:6d} {:6d} {:6d} {:.6e} {:.6e} {:.6e}\n",
+    //             ti + 1,
+    //             int(tr.e1 - 1),
+    //             int(tr.e2 - 1),
+    //             tr.radius() * dx,
+    //             t_shapeFacts[ti],
+    //             t_lengthP1toP2s[ti] * dx);
+    //     }
+    // }
 
     { /// ### 生成 _link2.dat 的内容到字符串
         std::stringstream ss;
@@ -500,6 +516,23 @@ auto compute_PYPNEData_string(blockNetwork &bn)
         }
         link2Content = ss.str();
     }
+
+    // { /// ### 生成 _link2.dat 的内容到字符串
+    //     for (int ti = 0; ti < int(throatIs.size()); ++ti)
+    //     {
+    //         const throatNE &tr = *throatIs[ti];
+    //         link2Content += std::format(
+    //             "{:6d} {:6d} {:6d} {:.6e} {:.6e} {:.6e} {:.6e} {:.1f}\n",
+    //             ti + 1,
+    //             int(tr.e1 - 1),
+    //             int(tr.e2 - 1),
+    //             t_lp1s[ti] * dx,
+    //             t_lp2s[ti] * dx,
+    //             t_ltrot[ti] * dx,
+    //             tr.volumn * dx * dx * dx,
+    //             0.0);
+    //     }
+    // }
 
     cout << ".\n";
     cout.flush();
@@ -570,6 +603,56 @@ auto compute_PYPNEData_string(blockNetwork &bn)
         }
         node1Content = ss.str();
     }
+    // { /// ### write _node1.dat file 到字符串
+    //     // 写入头部（总节点数、nx, ny, nz）
+    //     node1Content += std::format("{:6d}  {:.6e}  {:.6e}  {:.6e}\n",
+    //                                 poreIs.size() - 2,
+    //                                 cg.nx * dx,
+    //                                 cg.ny * dx,
+    //                                 cg.nz * dx);
+
+    //     for (int pid = 2; pid < int(poreIs.size()); ++pid) // 0和1是入口和出口
+    //     {
+    //         const poreNE &por = *poreIs[pid];
+
+    //         // 写入节点基本信息
+    //         node1Content += std::format("{:6d} {:.6e} {:.6e} {:.6e} {:3d}",
+    //                                     pid - 1,
+    //                                     por.mb->fi * dx + 0. * cg.X0[0],
+    //                                     por.mb->fj * dx + 0. * cg.X0[1],
+    //                                     por.mb->fk * dx + 0. * cg.X0[2],
+    //                                     int(por.contacts.size()));
+
+    //         int inlet = 0, outlet = 0;
+    //         // 第一次遍历contacts：写入连接的节点ID
+    //         for (const auto &[_, throat_idx] : por.contacts)
+    //         {
+    //             const throatNE *tb = throatIs[throat_idx];
+    //             const bool is_e1 = (tb->e1 == pid);
+    //             const int other_node = is_e1 ? tb->e2 : tb->e1;
+
+    //             // 检查入口/出口
+    //             if (other_node == 0)
+    //                 inlet = 1;
+    //             else if (other_node == 1)
+    //                 outlet = 1;
+
+    //             // 写入连接节点ID
+    //             node1Content += std::format("\t{:5d}", other_node - 1);
+    //         }
+
+    //         // 写入入口/出口标记
+    //         node1Content += std::format("\t{:5d}\t{:5d}", inlet, outlet);
+
+    //         // 第二次遍历contacts：写入throat ID
+    //         for (const auto &[_, throat_idx] : por.contacts)
+    //         {
+    //             node1Content += std::format("\t{:5d}", throat_idx + 1);
+    //         }
+
+    //         node1Content += "\n";
+    //     }
+    // }
 
     { /// ### 生成 _node2.dat 的内容到字符串
         std::stringstream ss;
@@ -584,6 +667,20 @@ auto compute_PYPNEData_string(blockNetwork &bn)
         }
         node2Content = ss.str();
     }
+
+    // { /// ### 生成 _node2.dat 的内容到字符串
+    //     for (int pid = 2; pid < int(poreIs.size()); ++pid)
+    //     {
+    //         const poreNE &por = *poreIs[pid];
+    //         node2Content += std::format(
+    //             "{:6d} {:.6e} {:.6e} {:.6e} {:.1f}\n",
+    //             pid - 1,
+    //             por.volumn * dx * dx * dx,
+    //             por.radius() * dx,
+    //             p_shape1s[pid],
+    //             0.0);
+    //     }
+    // }
 
     cout << ".\n";
     cout.flush();

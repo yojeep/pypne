@@ -8,12 +8,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++17，否则报错
 # set(CMAKE_BUILD_TYPE Release)
 
-set(CMAKE_BUILD_RPATH $ORIGIN) # 编译时从可执行文件所在目录查找
-set(CMAKE_INSTALL_RPATH $ORIGIN) # 运行时从可执行文件所在目录查找
-set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-# if(APPLE)
-# set(CMAKE_INSTALL_RPATH "@loader_path")
-# endif()
+# set(CMAKE_BUILD_RPATH $ORIGIN) # 编译时从可执行文件所在目录查找
+# set(CMAKE_INSTALL_RPATH $ORIGIN) # 运行时从可执行文件所在目录查找
+# set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
 
 # add_subdirectory(src/pnm/pnextract)
 find_package(pybind11 REQUIRED)
@@ -26,7 +24,7 @@ if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pypne_cpp PRIVATE -O3 -Wall) #${OpenMP_CXX_FLAGS} -DOpenMP) #-DOpenMP
-    target_link_libraries(pypne_cpp PRIVATE -static-libstdc++ -static-libgcc)
+    # target_link_libraries(pypne_cpp PRIVATE -static-libstdc++ -static-libgcc)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
         CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
         target_link_libraries(pypne_cpp PRIVATE stdc++fs)

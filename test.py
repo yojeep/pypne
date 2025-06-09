@@ -5,6 +5,7 @@ from io import StringIO
 
 sys.path[-1], sys.path[0] = sys.path[0], sys.path[-1]
 # from pypne import pnextract
+import scipy.io as sio
 import pypne
 
 image = np.fromfile("./image_100_300_300_pore.raw", dtype=np.uint8).reshape(
