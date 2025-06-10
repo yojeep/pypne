@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pypne"
-version = "0.0.13"
+version = "0.0.14"
 requires-python = ">=3.8"
 
 
@@ -13,9 +13,13 @@ cmake.source-dir = "."
 cmake.args = ["-G", "Ninja"]
 cmake.build-type = "Release"
 
-#[tool.cibuildwheel]
-#manylinux-x86_64-image = "manylinux_2_28"
-#manylinux-pypy_x86_64-image = "manylinux_2_28"
+### 0.0.13 is the last version that supports Centos7 !!!
+[tool.cibuildwheel]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+manylinux-pypy_x86_64-image = "manylinux_2_28"
+musllinux-x86_64-image = "musllinux_1_2"
+musllinux-aarch64-image = "musllinux_1_2"
 
 
 
