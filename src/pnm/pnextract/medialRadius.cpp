@@ -258,28 +258,26 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	double rBalls = 0.;
 
 	// OMPragma("omp parallel reduction(+:rBalls)")
-	{
-		std::vector<std::vector<node>> oldAliens(ny + 1, std::vector<node>(nx));
-		OMPragma("omp for") for (int j = 0; j < ny + 1; ++j) for (int i = 0; i < nx; ++i)
+	std::vector<std::vector<node>> oldAliens(ny + 1, std::vector<node>(nx));
+	for (int j = 0; j < ny + 1; ++j)
+		for (int i = 0; i < nx; ++i)
 		{
 			oldAliens[j][i].i = i;
 			oldAliens[j][i].j = j;
 			oldAliens[j][i].k = -nz / 2 - 1;
 		}
 
-		size_t nvxls10th = max(10 * int(vxlSpace.size() / 200), 1);
-		const voxel *const vnd = &*vxlSpace.end();
-		;
-		OMPragma("omp for") for (voxel *vit = &vxlSpace[0]; vit < vnd; ++vit)
+	size_t nvxls10th = max(10 * int(vxlSpace.size() / 200), 1);
+	// const voxel *const vnd = &*vxlSpace.end();
+	const voxel *vnd = vxlSpace.data() + vxlSpace.size();
+	for (voxel *vit = vxlSpace.data(); vit < vnd; ++vit)
+	{
+		calc_distmap(vit, 0, vxls, oldAliens);
+		if (size_t(vit) % nvxls10th == 0)
 		{
-			calc_distmap(&*vit, 0, vxls, oldAliens);
-			if (size_t(vit) % nvxls10th == 0)
-			{
-				(cout << "\r  distance map / sphere radius = " << vit->R).flush();
-			}
-#pragma omp atomic
-			rBalls += vit->R;
+			(cout << "\r  distance map / sphere radius = " << vit->R).flush();
 		}
+		rBalls += vit->R;
 	}
 	cout << "\n  average distance map = " << rBalls / nVxls << endl;
 
