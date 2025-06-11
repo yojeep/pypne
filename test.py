@@ -17,7 +17,7 @@ image_VElems, pn = pypne.pnextract(
     0.1,
     config_settings={"write_all": True, "name": "pn", "output_path": "./pn_output"},
     verbose=True,
-    n_workers=64,
+    n_workers=20,
 )
 
 
