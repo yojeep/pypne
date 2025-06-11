@@ -6,7 +6,9 @@
 #include "profilers.h"
 #include <iostream>
 #include "pypne.h"
-
+// #ifdef OpenMP
+#include <omp.h>
+// #endif
 namespace py = pybind11;
 using namespace pybind11::literals;
 using vec_str_pair = std::vector<std::pair<std::string, std::string>>;
@@ -43,8 +45,10 @@ py::array_t<T> vector_to_numpy(const std::vector<T> &vec)
     );
 }
 
-auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsigned char> arr, py::dict config_dict)
-{
+auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsigned char> arr, py::dict config_dict,int n_workers)
+{   
+    
+    omp_set_num_threads(n_workers);
     auto buf = arr.request();
     std::vector<unsigned char> data(arr.size());
     // auto arr_uncheck = arr.unchecked<1>();

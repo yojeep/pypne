@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 # set(CMAKE_C_COMPILER clang)
 # set(CMAKE_CXX_COMPILER clang++)
-set(CMAKE_CXX_COMPILER "g++")
+set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
 project(pypne_project LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 # set(CMAKE_BUILD_TYPE Release)
@@ -18,30 +18,29 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(pypne_cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/blockNet.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/pypne.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/medialSurf.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vtk.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vxl.cpp ${CMAKE_SOURCE_DIR}/src/libvoxel/voxelImage.cpp)
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
-target_include_directories(pypne_cpp PUBLIC ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/libvoxel ${CMAKE_SOURCE_DIR}/pybind11/include)
+target_include_directories(pypne_cpp PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/libvoxel ${CMAKE_SOURCE_DIR}/pybind11/include)
 
 if(MSVC)
-    target_compile_options(pypne_cpp PUBLIC /O2 /W1 /GL /LTGC /MT)
+    target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(pypne_cpp PUBLIC -O3 -Wall) #${OpenMP_CXX_FLAGS} -DOpenMP) #-DOpenMP
-    # target_link_libraries(pypne_cpp PUBLIC -static-libstdc++ -static-libgcc)
+    target_compile_options(pypne_cpp PRIVATE -O3 -Wall)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
         CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
-        target_link_libraries(pypne_cpp PUBLIC stdc++fs)
+        target_link_libraries(pypne_cpp PRIVATE stdc++fs)
     endif()
 endif()
 
 
 ###### OpenMP Parallelization ######
-option(USE_OMP "Enable OpenMP parallelization" OFF)
+option(USE_OMP "Enable OpenMP parallelization" ON)
 if(USE_OMP)
     find_package(OpenMP REQUIRED)
     if(MSVC)
         # MSVC 编译器不支持 OpenMP4.0
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
         # GCC/Clang 使用 -fopenmp
-        target_compile_options(pypne_cpp PUBLIC -fopenmp -DOpenMP)
-        target_link_libraries(pypne_cpp PUBLIC -Wl,-Bstatic -lgomp -Wl,-Bdynamic) # -Wl,-Bdynamic   return to dynamic linking
+        target_compile_options(pypne_cpp PRIVATE ${OpenMP_CXX_FLAGS} -DOpenMP)
+        target_link_libraries(pypne_cpp PRIVATE OpenMP::OpenMP_CXX)
     endif()
 endif()
 install(TARGETS pypne_cpp LIBRARY DESTINATION pypne/libcpp)

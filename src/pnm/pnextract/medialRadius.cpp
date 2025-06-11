@@ -257,16 +257,15 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	voxelImage vxls = segToVxlMesh(*this);
 	double rBalls = 0.;
 
-	OMPragma("omp parallel reduction(+:rBalls)")
+	// OMPragma("omp parallel reduction(+:rBalls)")
 	{
 		std::vector<std::vector<node>> oldAliens(ny + 1, std::vector<node>(nx));
-		for (int j = 0; j < ny + 1; ++j)
-			for (int i = 0; i < nx; ++i)
-			{
-				oldAliens[j][i].i = i;
-				oldAliens[j][i].j = j;
-				oldAliens[j][i].k = -nz / 2 - 1;
-			}
+		OMPragma("omp for") for (int j = 0; j < ny + 1; ++j) for (int i = 0; i < nx; ++i)
+		{
+			oldAliens[j][i].i = i;
+			oldAliens[j][i].j = j;
+			oldAliens[j][i].k = -nz / 2 - 1;
+		}
 
 		size_t nvxls10th = max(10 * int(vxlSpace.size() / 200), 1);
 		const voxel *const vnd = &*vxlSpace.end();
@@ -278,6 +277,7 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 			{
 				(cout << "\r  distance map / sphere radius = " << vit->R).flush();
 			}
+#pragma omp atomic
 			rBalls += vit->R;
 		}
 	}
