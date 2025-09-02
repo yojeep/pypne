@@ -415,144 +415,168 @@ void makeFriend(medialBall *vi, medialBall *vj)
 }*/
 
 void medialSurface::competeForParent(medialBall *vi, medialBall *vj)
-{ /// ## Select parent sphere between each nearby maximal-spheres to construct their hirachy
-
+{
 	const double noise = _MSNoise;
 
-	double ri = vi->R;
-	double rj = vj->R;
-	double riSqr = ri * ri;
-	double rjSqr = rj * rj;
-	double dSqr = distSqr(vi, vj);
+	const double ri = vi->R;
+	const double rj = vj->R;
+	const double riSqr = ri * ri;
+	const double rjSqr = rj * rj;
+	const double dSqr = distSqr(vi, vj);
+	const double dVal = sqrt(dSqr);
 
-	double wsinv = 1. / (riSqr + rjSqr);
-	//  double wi(dSqr+rjSqrlim-rlim), wj(dSqr+rlim-rjSqrlim);
+	const double wsinv = 1.0 / (riSqr + rjSqr);
+	const voxel *middlevxl = vxl(wsinv * (vi->fi * rjSqr + vj->fi * riSqr),
+								 wsinv * (vi->fj * rjSqr + vj->fj * riSqr),
+								 wsinv * (vi->fk * rjSqr + vj->fk * riSqr));
 
-	const voxel *middlevxl = vxl(wsinv * (vi->fi * rjSqr + vj->fi * riSqr), wsinv * (vi->fj * rjSqr + vj->fj * riSqr), wsinv * (vi->fk * rjSqr + vj->fk * riSqr));
-	if (middlevxl && middlevxl->R > min(ri, rj) * _midRf - 0.5 && 1.01 * sqrt(dSqr) < ri + rj + 1. + 1. * noise)
+	if (!middlevxl)
+		return;
+
+	const double minR = min(ri, rj);
+	if (middlevxl->R <= minR * _midRf - 0.5)
+		return;
+	if (1.01 * dVal >= ri + rj + 1.0 + noise)
+		return;
+
+	// Handle boss assignment cases
+	if (vj->boss == vj && vi->mastrSphere() != vj)
 	{
+		if (ri >= rj)
+			vj->boss = vi;
+		else if (vi->boss->R <= rj)
+			vi->boss = vj;
+		else if (ri >= rj - noise && ri * _vmvRadRelNf + noise >= rj)
+			vj->boss = vi;
+	}
+	else if (vi->boss == vi && vj->mastrSphere() != vi)
+	{
+		if (rj >= ri)
+			vi->boss = vj;
+		else if (vj->boss->R <= ri)
+			vj->boss = vi;
+		else if (rj >= ri - noise && rj * _vmvRadRelNf + noise >= ri)
+			vi->boss = vj;
+	}
 
-		if (vj->boss == vj)
+	medialBall *mvi = vi->mastrSphere();
+	medialBall *mvj = vj->mastrSphere();
+
+	if (mvi == vj || mvj == vi)
+		return;
+
+	if (mvi == mvj)
+	{
+		const short leveli = vi->level();
+		const short levelj = vj->level();
+		const short levelDiff = leveli - levelj;
+
+		const double distViBoss = dist(vi->boss, vi);
+		const double distVjBoss = dist(vj->boss, vj);
+		const double distViVj = dist(vi, vj);
+
+		if (levelDiff < -1) // leveli + 1 < levelj
 		{
-			if (vi->mastrSphere() != vj)
+			if ((vj->boss->R - vj->R + 2 * noise) / (distVjBoss + 0.25) <
+				(vi->R - vj->R + 2 * noise + 0.01) / (distViVj + 0.2))
+				vj->boss = vi;
+		}
+		else if (levelDiff > 1) // leveli > levelj + 1
+		{
+			if ((vi->boss->R - vi->R + 2 * noise) / (distViBoss + 0.25) <
+				(vj->R - vi->R + 2 * noise + 0.01) / (distViVj + 0.2))
+				vi->boss = vj;
+		}
+		else
+		{
+			if (levelDiff > 0) // leveli > levelj
 			{
-				if (ri >= rj)
-					vj->boss = vi;
-				else if (vi->boss->R <= rj)
+				if ((vi->boss->R - vi->R + 2 * noise) / (distViBoss + 1.2) <
+						(vj->R - vi->R + 2 * noise) / (distViVj + 1.3) &&
+					!vj->inParents(vi))
 					vi->boss = vj;
-				else if (ri >= rj - noise && ri * _vmvRadRelNf + 1. * noise >= rj)
+			}
+			else if (levelDiff < 0) // leveli < levelj
+			{
+				if ((vj->boss->R - vj->R + 2 * noise) / (distVjBoss + 1.2) <
+						(vi->R - vj->R + 2 * noise) / (distViVj + 1.3) &&
+					!vi->inParents(vj))
+					vj->boss = vi;
+			}
+
+			if (middlevxl->R >= 0.45 * (ri + rj) - 1.0 && dVal < (ri + rj) * 0.5 + 2.0)
+				makeFriend(vi, vj);
+		}
+	}
+	else // mvi != mvj
+	{
+		const double avgR = 0.5 * (mvi->R + mvj->R);
+		if (distSqr(mvi, mvj) <= _lenNf * (avgR + 2 * noise) * (avgR + 2 * noise))
+		{
+			// Ensure mvi is the larger one
+			if (mvi->R < mvj->R)
+			{
+				std::swap(vi, vj);
+				std::swap(mvi, mvj);
+			}
+
+			if (mvj->R < _vmvRadRelNf * vj->R + noise &&
+				mvj->R < _vmvRadRelNf * vi->R + noise &&
+				mvj->R < _vmvRadRelNf * vi->boss->R + noise)
+			{
+				while (vj != vj->boss && mvj->R < _vmvRadRelNf * vj->boss->R + noise)
+				{
+					medialBall *pvj = vj->boss;
+					vj->boss = vi;
+					vi = vj;
+					vj = pvj;
+				}
+				if (vj->boss == vj && vi->mastrSphere() != vj)
 					vj->boss = vi;
 			}
 		}
-		else if (vi->boss == vi)
+
+		if (vi != vj->boss)
 		{
-			if (vj->mastrSphere() != vi)
+			mvi = vi->mastrSphere();
+			mvj = vj->mastrSphere();
+
+			short leveli = vi->level();
+			short levelj = vj->level();
+			const double distMviMvj = dist(mvi, mvj);
+			const double distAvg = distMviMvj + 0.5 * noise;
+
+			while (leveli >= levelj)
 			{
-				if (rj >= ri)
-					vi->boss = vj;
-				else if (vj->boss->R <= ri)
-					vj->boss = vi;
-				else if (rj >= ri - noise && rj * _vmvRadRelNf + 1. * noise >= ri)
-					vi->boss = vj;
+				const double viBossRatio = (vi->boss->R - vi->R + 0.55 * noise) / (dist(mvi, vi) + distAvg);
+				const double vjRatio = (vj->R - vi->R + 0.5 * noise) / (dist(mvj, vi) + distAvg);
+				if (viBossRatio >= vjRatio)
+					break;
+
+				medialBall *pvi = vi->boss;
+				vi->boss = vj;
+				vj = vi;
+				vi = pvi;
+				++levelj;
+				--leveli;
 			}
-		}
 
-		medialBall *mvi = vi->mastrSphere();
-		medialBall *mvj = vj->mastrSphere();
-		if (mvi != vj && mvj != vi)
-		{
-
-			if (mvi == mvj)
+			while (levelj >= leveli)
 			{
+				const double vjBossRatio = (vj->boss->R - vj->R + 0.55 * noise) / (dist(mvj, vj) + distAvg);
+				const double viRatio = (vi->R - vj->R + 0.5 * noise) / (dist(mvi, vj) + distAvg);
+				if (vjBossRatio >= viRatio)
+					break;
 
-				short leveli = vi->level();
-				short levelj = vj->level();
-
-				if (leveli + 1 < levelj &&
-					(vj->boss->R - vj->R + 2. * noise) / (dist(vj->boss, vj) + 0.25) < (vi->R - vj->R + 2. * noise + 0.01) / (dist(vi, vj) + 0.2))
-					vj->boss = vi;
-				else if (leveli > levelj + 1 &&
-						 (vi->boss->R - vi->R + 2. * noise) / (dist(vi->boss, vi) + 0.25) < (vj->R - vi->R + 2. * noise + 0.01) / (dist(vj, vi) + 0.2))
-					vi->boss = vj;
-				else
-				{ // if (leveli == levelj   or  leveli==levelj+1 ...)
-
-					if (leveli > levelj && (vi->boss->R - vi->R + 2. * noise) / (dist(vi->boss, vi) + 1.2) < (vj->R - vi->R + 2. * noise) / (dist(vj, vi) + 1.3) && !vj->inParents(vi))
-						vi->boss = vj;
-					else if (leveli < levelj && (vj->boss->R - vj->R + 2. * noise) / (dist(vj->boss, vj) + 1.2) < (vi->R - vj->R + 2. * noise) / (dist(vi, vj) + 1.3) && !vi->inParents(vj))
-						vj->boss = vi;
-					else if (middlevxl && middlevxl->R >= 0.45 * (ri + rj) - 1. && sqrt(dSqr) < (ri + rj) * 0.5 + 2.)
-						makeFriend(vi, vj);
-				}
-				if (vi->mastrSphere() != vj->mastrSphere())
-				{
-					cout << "sdsdsds" << endl;
-					exit(-1);
-				}
+				medialBall *pvj = vj->boss;
+				vj->boss = vi;
+				vi = vj;
+				vj = pvj;
+				++leveli;
+				--levelj;
 			}
-			else
-			{ // if (mvi!=mvj)
 
-				if (distSqr(mvi, mvj) <= _lenNf * (0.5 * (mvi->R + mvj->R) + 2. * noise) * (0.5 * (mvi->R + mvj->R) + 2. * noise))
-				{
-
-					if (mvi->R < mvj->R)
-					{
-						medialBall *tmp = vi;
-						vi = vj;
-						vj = tmp;
-						tmp = mvi;
-						mvi = mvj;
-						mvj = tmp;
-					}
-
-					if (mvj->R < _vmvRadRelNf * vj->R + noise && mvj->R < _vmvRadRelNf * vi->R + noise && mvj->R < _vmvRadRelNf * vi->boss->R + noise)
-					{
-						while (vj != vj->boss && mvj->R < _vmvRadRelNf * vj->boss->R + noise)
-						{
-							medialBall *pvj = vj->boss;
-							vj->boss = vi;
-							vi = vj;
-							vj = pvj;
-							cout << '.';
-						}
-						if (vj->boss == vj && vi->mastrSphere() != vj)
-							vj->boss = vi;
-					}
-				}
-
-				if (vi != vj->boss)
-				{
-
-					mvi = vi->mastrSphere();
-					mvj = vj->mastrSphere();
-
-					short leveli = vi->level();
-					short levelj = vj->level();
-
-					float distAvg = dist(mvj, mvi) * 1. + 0.5 * noise;
-					while (leveli >= levelj && (vi->boss->R - vi->R + 0.55 * noise) / (dist(mvi, vi) + distAvg) < (vj->R - vi->R + 0.5 * noise) / (dist(mvj, vi) + distAvg))
-					{
-						medialBall *pvi = vi->boss;
-						vi->boss = vj;
-						vj = vi;
-						vi = pvi;
-						++levelj;
-						--leveli;
-					}
-					while (levelj >= leveli && (vj->boss->R - vj->R + 0.55 * noise) / (dist(mvj, vj) + distAvg) < (vi->R - vj->R + 0.5 * noise) / (dist(mvi, vj) + distAvg))
-					{
-						medialBall *pvj = vj->boss;
-						vj->boss = vi;
-						vi = vj;
-						vj = pvj;
-						++leveli;
-						--levelj;
-					}
-
-					makeFriend(vi, vj);
-				}
-			}
+			makeFriend(vi, vj);
 		}
 	}
 }
