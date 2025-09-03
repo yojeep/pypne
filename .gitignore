@@ -2,7 +2,7 @@
 Make/*/
 bin/
 build/*
-include/
+##include/
 lib/
 share/
 test/
