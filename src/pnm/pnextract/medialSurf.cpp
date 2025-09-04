@@ -230,53 +230,42 @@ void medialSurface::paradoxremoveincludedballI()
 		const int y = vi->j;
 		const int z = vi->k;
 		const float ri = vi->R;
-		const float ripinc = ri + 0.55f; //.+RPreDelete
-		const float ripinc_sq = ripinc * ripinc;
+		const float ripinc = ri + 0.55; //.+RPreDelete
 		const float mbmbDist = _RCorsnf * ri + _RCorsn;
 
-		const int ex = static_cast<int>(ripinc);
-		// const float ex_sq = ex * ex;
-
+		int ex, ey, ez;
+		ex = ripinc;
 		for (int a = -ex; a <= ex; ++a)
 		{
-			const float a_sq = a * a;
-			const float ey_sq = ripinc_sq - a_sq;
-
-			if (ey_sq <= 0)
+			ey = std::sqrt(ripinc * ripinc - a * a);
+			if (std::isnan(ey))
 				continue;
-			const int ey = static_cast<int>(sqrtf(ey_sq));
-
 			for (int b = -ey; b <= ey; ++b)
 			{
-				const float b_sq = b * b;
-				const float ez_sq = ey_sq - b_sq;
-
-				if (ez_sq <= 0)
+				ez = sqrt(ripinc * ripinc - a * a - b * b); // sqrts(r2i)+1-a-b;
+				if (std::isnan(ez))
 					continue;
-				const int ez = static_cast<int>(sqrtf(ez_sq));
-
 				for (int c = -ez; c <= ez; ++c)
 				{
 					voxel *vj = vxl(x + a, y + b, z + c);
-					if (!vj || !vj->ball || vj == vi)
-						continue;
-
-					const float rj = vj->R;
-					if (rj > ri)
-						continue;
-
-					const float c_sq = c * c;
-					const float D_sq = a_sq + b_sq + c_sq;
-					const float D = sqrtf(D_sq);
-
-					if (D < mbmbDist || (D + rj < ripinc + _MSNoise))
+					if ((vj != nullptr) && (vj->ball) && (vj != vi))
 					{
-						vj->ball = nullptr;
-						++ndel;
+						const float rj = vj->R;
+						if (rj <= ri)
+						{
+							float D = sqrtf(a * a + b * b + c * c);
+
+							if (D < mbmbDist || (D + rj < ripinc + _MSNoise))
+							{
+								vj->ball = nullptr;
+								++ndel;
+							}
+						}
 					}
 				}
 			}
 		}
+
 		++vpp;
 		if ((vpp - tvs.begin()) % 10000 == 0)
 			cout << "\r  remove = " << ndel;

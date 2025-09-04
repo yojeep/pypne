@@ -134,78 +134,52 @@ void blockNetwork::CreateVElem(size_t startValue)
 		cout << " mapping pores indices to image, for index " << 0 << ":  " << firstPores << " to " << lastPores << ",  unasigned:" << uasyned << endl;
 
 		for (const auto &bi : balspc)
-		{
-			if (!bi.boss)
-				continue;
-
-			medialBall *mastrSphere = bi.mastrSphere();
-			const float apmi = mastrSphere->fi, bpmi = mastrSphere->fj, cpmi = mastrSphere->fk;
-			const int VElemV = VElems(apmi + 1, bpmi + 1, cpmi + 1);
-			ensure(VElemV > 0 && VElemV < len(poreIs));
-
-			const float x = bi.fi, y = bi.fj, z = bi.fk;
-			// const float dx = x - apmi, dy = y - bpmi, dz = z - cpmi;
-			const float R = bi.R;
-			const float quarterR = std::max(R * 0.25f - 1.0f, 1.001f);
-			const int r2 = quarterR * quarterR;
-			const float ex = std::sqrt(r2);
-
-			const float x_min = std::max(x - ex, 0.5f);
-			const float x_max = std::min(x + ex, cg.nx - 0.5f);
-
-			for (float xpa = x_min; xpa <= x_max; xpa += 1.0f)
+			if (bi.boss)
 			{
-				const float dx_x = xpa - x;
-				const float dx_x_sq = dx_x * dx_x;
-				const float ey_sq = r2 - dx_x_sq;
+				medialBall *mastrSphere = bi.mastrSphere();
+				float apmi(mastrSphere->fi), bpmi(mastrSphere->fj), cpmi(mastrSphere->fk);
+				int VElemV = VElems(apmi + 1, bpmi + 1, cpmi + 1);
+				ensure(VElemV > 0 && VElemV < len(poreIs));
 
-				if (ey_sq <= 0)
-					continue;
-				const float ey = std::sqrt(ey_sq);
+				const float x = bi.fi, y = bi.fj, z = bi.fk;
+				apmi = x - mastrSphere->fi;
+				bpmi = y - mastrSphere->fj;
+				cpmi = z - mastrSphere->fk;
+				float R = bi.R;
+				int r2 = std::max(R * 0.25 - 1., 1.001) * std::max(R * 0.25 - 1., 1.001);
 
-				const float y_min = std::max(y - ey, 0.5f);
-				const float y_max = std::min(y + ey, cg.ny - 0.5f);
-
-				for (float ypb = y_min; ypb <= y_max; ypb += 1.0f)
+				float ex = std::sqrt(r2);
+				for (float xpa = max((x - ex), 0.5f); xpa <= min((x + ex), cg.nx - 0.5f); xpa += 1.0f)
 				{
-					const float dy_y = ypb - y;
-					const float dy_y_sq = dy_y * dy_y;
-					const float ez_sq = ey_sq - dy_y_sq;
-
-					if (ez_sq <= 0)
+					float ey = std::sqrt(r2 - (xpa - x) * (xpa - x));
+					if (std::isnan(ey))
 						continue;
-					const float ez = std::sqrt(ez_sq);
-
-					const float z_min = std::max(z - ez, 0.5f);
-					const float z_max = std::min(z + ez, cg.nz - 0.5f);
-
-					for (float zpc = z_min; zpc <= z_max; zpc += 1.0f)
+					for (float ypb = max((y - ey), 0.5f); ypb <= min((y + ey), cg.ny - 0.5f); ypb += 1.0f)
 					{
-						const int idj = VElems(xpa + 1, ypb + 1, zpc + 1);
-
-						if (idj == (-1 - int(0)))
+						float ez = std::sqrt(r2 - (xpa - x) * (xpa - x) - (ypb - y) * (ypb - y));
+						if (std::isnan(ez))
+							continue;
+						for (float zpc = max((z - ez), 0.5f); zpc <= min((z + ez), cg.nz - 0.5f); zpc += 1.0f)
 						{
-							VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV;
-						}
-						else if (VElemV != idj && (firstPoreInd <= idj && idj <= lastPoreInd))
-						{
-							voxel *vj = srf->vxl(xpa, ypb, zpc);
-							if (!vj->ball && vj->R < R)
+							int idj = VElems(xpa + 1, ypb + 1, zpc + 1);
+							if (idj == (-1 - int(0)))
+								VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV;
+							else if (VElemV != idj && (firstPoreInd <= idj && idj <= lastPoreInd))
 							{
-								const medialBall *mvj = poreIs[idj]->mb;
-								const float ami = xpa - apmi, bmi = ypb - bpmi, cmi = zpc - cpmi;
-								const float amj = xpa - mvj->fi, bmj = ypb - mvj->fj, cmj = zpc - mvj->fk;
-
-								if (ami * ami + bmi * bmi + cmi * cmi < amj * amj + bmj * bmj + cmj * cmj)
+								voxel *vj = srf->vxl(xpa, ypb, zpc);
+								if (!vj->ball && vj->R < R)
 								{
-									VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV;
+									const medialBall *mvj = poreIs[idj]->mb;
+									float amj = xpa - mvj->fi, bmj = ypb - mvj->fj, cmj = zpc - mvj->fk;
+									float ami = xpa - mastrSphere->fi, bmi = ypb - mastrSphere->fj, cmi = zpc - mastrSphere->fk;
+									if (ami * ami + bmi * bmi + cmi * cmi < amj * amj + bmj * bmj + cmj * cmj)
+										VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV; // elem->id;
 								}
 							}
 						}
 					}
 				}
 			}
-		}
 
 		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
 		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
