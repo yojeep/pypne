@@ -103,7 +103,7 @@ public:
 	// 	else
 	// 		return boss->level() + 1;
 	// }
-	short level() const
+	int level() const
 	{
 		const medialBall *current = this;
 		short count = 1;
