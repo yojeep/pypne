@@ -233,29 +233,34 @@ void medialSurface::paradoxremoveincludedballI()
 		const float ripinc = ri + 0.55; //.+RPreDelete
 		const float mbmbDist = _RCorsnf * ri + _RCorsn;
 
-		int ex, ey, ez;
-		ex = ripinc;
+		const int ex = ripinc;
+		const float ripinc_sq = static_cast<float>(ripinc * ripinc);
 		for (int a = -ex; a <= ex; ++a)
 		{
-			ey = std::sqrt(ripinc * ripinc - a * a);
-			if (std::isnan(ey))
+			const float a_sq = static_cast<float>(a * a);
+			const float remaining_ey_sq = ripinc_sq - a_sq;
+			if (remaining_ey_sq < 0.0f)
 				continue;
+			const int ey = static_cast<int>(std::sqrt(remaining_ey_sq));
 			for (int b = -ey; b <= ey; ++b)
 			{
-				ez = sqrt(ripinc * ripinc - a * a - b * b); // sqrts(r2i)+1-a-b;
-				if (std::isnan(ez))
+				const float b_sq = static_cast<float>(b * b);
+				const float remaining_ez_sq = remaining_ey_sq - b_sq;
+				if (remaining_ez_sq < 0.0f)
 					continue;
+				const int ez = static_cast<int>(std::sqrt(remaining_ez_sq));
 				for (int c = -ez; c <= ez; ++c)
 				{
 					voxel *vj = vxl(x + a, y + b, z + c);
-					if ((vj != nullptr) && (vj->ball) && (vj != vi))
+					if (vj && vj->ball && vj != vi)
 					{
 						const float rj = vj->R;
 						if (rj <= ri)
 						{
-							float D = sqrtf(a * a + b * b + c * c);
-
-							if (D < mbmbDist || (D + rj < ripinc + _MSNoise))
+							const float D_sq = a_sq + b_sq + static_cast<float>(c * c);
+							const float D = std::sqrt(D_sq);
+							const float threshold = ripinc + _MSNoise;
+							if (D < mbmbDist || (D + rj < threshold))
 							{
 								vj->ball = nullptr;
 								++ndel;
@@ -585,17 +590,33 @@ void medialSurface::findBoss(medialBall *vi)
 {
 
 	const float x = vi->fi, y = vi->fj, z = vi->fk;
-	const float ripp = vi->R * 0.6 + 2. * _MSNoise + 2.;
-	const float ex = x + ripp;
-	for (float xpa = 2. * x - ex; xpa <= ex; xpa += 1.0f)
+	const float ripp = vi->R * 0.6f + 2.0f * _MSNoise + 2.0f;
+	const float ripp_sq = ripp * ripp;
+	const float x_min = x - ripp;
+	const float x_max = x + ripp;
+	for (float xpa = x_min; xpa <= x_max; xpa += 1.0f)
 	{
-		float ey = y + sqrt(ripp * ripp - (xpa - x) * (xpa - x));
-		for (float ypb = 2. * y - ey; ypb <= ey; ypb += 1.0f)
+		const float dx = xpa - x;
+		const float dx_sq = dx * dx;
+		const float remaining_ey_sq = ripp_sq - dx_sq;
+		if (remaining_ey_sq < 0.0f)
+			continue;
+		const float ey = std::sqrt(remaining_ey_sq);
+		const float y_min = y - ey;
+		const float y_max = y + ey;
+		for (float ypb = y_min; ypb <= y_max; ypb += 1.0f)
 		{
-			float ez = z + sqrt(ripp * ripp - (xpa - x) * (xpa - x) - (y - ypb) * (y - ypb));
-			for (float zpc = 2. * z - ez; zpc <= ez; zpc += 1.0f)
+			const float dy = y - ypb;
+			const float dy_sq = dy * dy;
+			const float remaining_ez_sq = remaining_ey_sq - dy_sq;
+			if (remaining_ez_sq < 0.0f)
+				continue;
+			const float ez = std::sqrt(remaining_ez_sq);
+			const float z_min = z - ez;
+			const float z_max = z + ez;
+			for (float zpc = z_min; zpc <= z_max; zpc += 1.0f)
 			{
-				voxel *vj = this->vxl(xpa, ypb, zpc);
+				voxel *vj = vxl(xpa, ypb, zpc);
 				if ((vj != nullptr) && vj->ball && (*vi != *vj))
 				{ //--------------------------------------------------------
 					competeForParent(&*vi, vj->ball);
@@ -710,15 +731,18 @@ void medialSurface::createBallsAndHierarchy()
 }
 
 voxelImage segToVxlMesh(const medialSurface &ref)
-{ /// converts segments back to voxelImage
+{ /// converts segments back to voxelImage with OpenMP parallelization
 	voxelImage vxls(ref.nx, ref.ny, ref.nz, 255);
-	for (int iz = 0; iz < ref.nz; ++iz)
+
+	// 使用OpenMP并行化最外层循环，每个线程处理不同的z层
+	OMPragma("omp parallel for collapse(2) schedule(dynamic)") for (int iz = 0; iz < ref.nz; ++iz)
 	{
 		for (int iy = 0; iy < ref.ny; ++iy)
 		{
 			const segments &s = ref.segs_[iz][iy];
 			for (int ix = 0; ix < s.cnt; ++ix)
 			{
+				// 每个线程独立访问和修改vxls中不同的区域，不会有数据冲突
 				std::fill(&vxls(s.s[ix].start, iy, iz), &vxls(s.s[ix + 1].start, iy, iz), s.s[ix].value);
 			}
 		}
@@ -986,46 +1010,17 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 			oldAliens.back().emplace_back(i, j, k); // 直接构造 node
 		}
 	}
-	// // 按i维度创建体素索引映射
-	// std::vector<std::vector<voxel *>> iToVoxels(nx);
-	// const int voxel_per_i = ny * nz; // 每个 i 的体素数量
-
-	// // 预分配内存（关键优化）
-	// for (int i = 0; i < nx; ++i)
-	// {
-	// 	iToVoxels[i].reserve(voxel_per_i);
-	// }
-
-	// // 直接计算指针范围并批量复制
-	// voxel *start = vxlSpace.data();
-	// for (int i = 0; i < nx; ++i)
-	// {
-	// 	voxel *end = start + voxel_per_i;
-	// 	// 批量复制指针（O(1) 时间复杂度）
-	// 	iToVoxels[i].assign(start, end);
-	// 	start = end; // 移动到下一个 i 的起始位置
-	// }
-
-// 以i为线程并行遍历
-#pragma omp parallel for reduction(+ : rBalls) schedule(static)
-	for (int i = 0; i < nx; ++i)
+	size_t nvxls10th = max(10 * int(vxlSpace.size() / 200), 1);
+	// const voxel *const vnd = &*vxlSpace.end();
+	const voxel *vnd = vxlSpace.data() + vxlSpace.size();
+	for (voxel *vit = vxlSpace.data(); vit < vnd; ++vit)
 	{
-		const size_t start = i * ny * nz;
-		const size_t end = start + ny * nz;
-		for (size_t idx = start; idx < end; ++idx)
+		calc_distmap(*vit, 0, vxls, oldAliens);
+		if (size_t(vit) % nvxls10th == 0)
 		{
-			voxel &vit = vxlSpace[idx];
-
-			calc_distmap(vit, 0, vxls, oldAliens);
-			rBalls += vit.R;
+			(cout << "\r  distance map / sphere radius = " << vit->R).flush();
 		}
-
-		// 线程安全的进度输出
-		if (i % (nx / 20 + 1) == 0)
-		{
-#pragma omp critical
-			(cout << "\r  calculated percentage = " << i * 100 / nx << "%").flush();
-		}
+		rBalls += vit->R;
 	}
 	cout << "\n  average distance map = " << rBalls / nVxls << endl;
 

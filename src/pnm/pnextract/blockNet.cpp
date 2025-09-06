@@ -149,16 +149,26 @@ void blockNetwork::CreateVElem(size_t startValue)
 				int r2 = std::max(R * 0.25 - 1., 1.001) * std::max(R * 0.25 - 1., 1.001);
 
 				float ex = std::sqrt(r2);
+				// Cache master sphere coordinates
+				const float m_fi = mastrSphere->fi;
+				const float m_fj = mastrSphere->fj;
+				const float m_fk = mastrSphere->fk;
 				for (float xpa = max((x - ex), 0.5f); xpa <= min((x + ex), cg.nx - 0.5f); xpa += 1.0f)
 				{
-					float ey = std::sqrt(r2 - (xpa - x) * (xpa - x));
-					if (std::isnan(ey))
+					float dx = xpa - x;
+					float dx_sq = dx * dx;
+					float remaining_ey = r2 - dx_sq;
+					if (remaining_ey < 0.0f)
 						continue;
+					float ey = std::sqrt(remaining_ey);
 					for (float ypb = max((y - ey), 0.5f); ypb <= min((y + ey), cg.ny - 0.5f); ypb += 1.0f)
 					{
-						float ez = std::sqrt(r2 - (xpa - x) * (xpa - x) - (ypb - y) * (ypb - y));
-						if (std::isnan(ez))
+						float dy = ypb - y;
+						float dy_sq = dy * dy;
+						float remaining_ez = remaining_ey - dy_sq;
+						if (remaining_ez < 0.0f)
 							continue;
+						float ez = std::sqrt(remaining_ez);
 						for (float zpc = max((z - ez), 0.5f); zpc <= min((z + ez), cg.nz - 0.5f); zpc += 1.0f)
 						{
 							int idj = VElems(xpa + 1, ypb + 1, zpc + 1);
@@ -171,7 +181,7 @@ void blockNetwork::CreateVElem(size_t startValue)
 								{
 									const medialBall *mvj = poreIs[idj]->mb;
 									float amj = xpa - mvj->fi, bmj = ypb - mvj->fj, cmj = zpc - mvj->fk;
-									float ami = xpa - mastrSphere->fi, bmi = ypb - mastrSphere->fj, cmi = zpc - mastrSphere->fk;
+									float ami = xpa - m_fi, bmi = ypb - m_fj, cmi = zpc - m_fk;
 									if (ami * ami + bmi * bmi + cmi * cmi < amj * amj + bmj * bmj + cmj * cmj)
 										VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV; // elem->id;
 								}
