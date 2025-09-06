@@ -3,7 +3,7 @@
 #include "medialSurf.h"
 #include "typses.h"
 
-// #include "medialRadius.cpp"
+#include "medialRadius.cpp"
 
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
 	: cg_(cfg), segs_(cfg.segs_), ToBeAssigned(0)
@@ -729,6 +729,7 @@ void medialSurface::createBallsAndHierarchy()
 		cout << "\r   ball: " << int(vi - voxp) << endl;
 	}
 }
+<<<<<<< HEAD
 
 voxelImage segToVxlMesh(const medialSurface &ref)
 { /// converts segments back to voxelImage with OpenMP parallelization
@@ -1131,3 +1132,5 @@ void medialSurface::smoothRadius()
 		cout << " maxrrr " << maxrrr << endl;
 	}
 }
+=======
+>>>>>>> parent of 433f4a0 (copy)
