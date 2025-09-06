@@ -103,7 +103,7 @@ public:
 	// 	else
 	// 		return boss->level() + 1;
 	// }
-	inline short level() const
+	short level() const
 	{
 		const medialBall *current = this;
 		short count = 1;
@@ -125,73 +125,39 @@ public:
 	// 	else
 	// 		return boss->inParents(vj);
 	// }
-	// 优化版本：添加快速路径和减少内存访问
-	inline bool inParents(medialBall *vj) const
+	bool inParents(medialBall *vj) const
 	{
-		// 快速路径：如果vj是当前节点或直接父节点
-		if (this == vj || boss == vj)
-		{
-			return true;
-		}
+		const medialBall *current = this;
 
-		// 如果当前是根节点，直接返回false
-		if (boss == this)
+		while (current != current->boss)
 		{
-			return false;
-		}
-
-		// 遍历父节点链，缓存next指针减少内存访问
-		const medialBall *current = boss;
-		while (true)
-		{
-			const medialBall *next = current->boss;
-			// 如果到达根节点，退出循环
-			if (next == current)
-			{
-				break;
-			}
-			// 检查下一个父节点是否为vj
-			if (next == vj)
+			if (current->boss == vj)
 			{
 				return true;
 			}
-			current = next;
+			current = current->boss;
 		}
 
 		return false;
 	}
-	// 优化版本：迭代实现避免栈溢出，减少内存访问
-	inline medialBall *mastrSphere() const
+	// medialBall *mastrSphere() const
+	// {
+	// 	if (this == boss)
+	// 		return boss;
+	// 	else
+	// 		return boss->mastrSphere();
+	// }
+	medialBall *mastrSphere() const
 	{
-		// 快速路径：如果已是根节点，直接返回
-		if (boss == this)
-			return const_cast<medialBall *>(this);
-
 		medialBall *current = const_cast<medialBall *>(this);
-		medialBall *next;
-		// 迭代遍历代替递归，避免栈溢出和函数调用开销
-		while ((next = current->boss) != current)
+
+		while (current != current->boss)
 		{
-			current = next;
+			current = current->boss;
 		}
+
 		return current;
 	}
-	// 优化版本：添加快速路径和减少内存访问
-	// inline medialBall *mastrSphere() const
-	// {
-	// 	// 快速路径：如果已是根节点，直接返回
-	// 	if (boss == this)
-	// 		return const_cast<medialBall*>(this);
-
-	// 	medialBall *current = const_cast<medialBall*>(this);
-	// 	medialBall *next;
-	// 	// 合并条件判断与赋值，减少内存访问
-	// 	while ((next = current->boss) != current)
-	// 	{
-	// 		current = next;
-	// 	}
-	// 	return current;
-	// }
 
 	// inline const medialBall* smallestP() const
 	//{	const medialBall* pMin = this;

@@ -36,7 +36,7 @@ public:
 	void paradoxremoveincludedballI();
 
 	void calc_distmaps();
-	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const;
+	void calc_distmap(voxel *vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const;
 
 	void buildvoxelspace();
 
