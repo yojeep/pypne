@@ -30,12 +30,12 @@ public:
 	};
 
 	medialSurface(inputDataNE &cfg);
-
 	void setDefaults(double avgRad);
 	void paradox_pre_removeincludedballI();
 	void paradoxremoveincludedballI();
 
 	void calc_distmaps();
+	std::vector<std::vector<size_t>> iZ;
 	void calc_distmap(voxel *vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const;
 
 	void buildvoxelspace();
