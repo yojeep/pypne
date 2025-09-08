@@ -634,10 +634,10 @@ voxelImage segToVxlMesh(const medialSurface &ref)
 	return vxls;
 }
 
-void medialSurface::calc_distmap(voxel *vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const
+void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const
 {
 
-	const int i = vit->i, j = vit->j, k = vit->k;
+	const int i = vit.i, j = vit.j, k = vit.k;
 
 	node nalien(i, j, -nz);
 
@@ -824,7 +824,7 @@ void medialSurface::calc_distmap(voxel *vit, unsigned char vValue, const voxelIm
 		nalien.i = (i < nx / 2) ? -nx / 4 - 1 : nx * 5 / 4 + 1;
 		nalien.j = (j < ny / 2) ? -ny / 4 - 1 : ny * 5 / 4 + 1;
 		nalien.k = (k < nz / 2) ? -nz / 4 - 1 : nz * 5 / 4 + 1;
-		vit->R = sqrt((nalien.i - i) * (nalien.i - i) + (nalien.j - j) * (nalien.j - j) + (nalien.k - k) * (nalien.k - k)) - 0.5;
+		vit.R = sqrt((nalien.i - i) * (nalien.i - i) + (nalien.j - j) * (nalien.j - j) + (nalien.k - k) * (nalien.k - k)) - 0.5;
 	}
 	else
 	{
@@ -840,7 +840,7 @@ void medialSurface::calc_distmap(voxel *vit, unsigned char vValue, const voxelIm
 		iSqr = min((i + 2), (nx - i + 1));
 		if (iSqr < limit)
 			limit = max((1. - _clipROutx) * limit + _clipROutx * iSqr, 0.1);
-		vit->R = limit;
+		vit.R = limit;
 
 		if (frz2 <= 0)
 			cout << "WTF frz2 = " << frz2 << endl;
@@ -875,27 +875,32 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	voxelImage vxls = segToVxlMesh(*this);
 	double rBalls = 0.;
 	const int k = -nz / 2 - 1;
-	std::vector<std::vector<node>> oldAliens;
-
-	oldAliens.reserve(ny + 1); // 预分配外层
-	for (int j = 0; j < ny + 1; ++j)
-	{
-		oldAliens.emplace_back();	  // 添加一个空 vector
-		oldAliens.back().reserve(nx); // 预分配内层
-		for (int i = 0; i < nx; ++i)
-		{
-			oldAliens.back().emplace_back(i, j, k); // 直接构造 node
-		}
-	}
-
+	thread_local std::vector<std::vector<node>> oldAliens;
 	size_t nvxls10th = max(10 * int(vxlSpace.size() / 200), 1);
 	// 使用iZ进行z方向并行处理
-	OMPragma("omp parallel for reduction(+:rBalls) firstprivate(oldAliens) schedule(dynamic)") for (int iz = 0; iz < nz; ++iz)
+	OMPragma("omp parallel for reduction(+:rBalls) schedule(dynamic)") for (int iz = 0; iz < nz; ++iz)
 	{
+		// 使用静态局部变量确保每个线程只初始化一次
+		static thread_local bool initialized = false;
+		// cout << initialized << endl;
+		if (!initialized)
+		{
+			oldAliens.reserve(ny + 1);
+			for (int j = 0; j < ny + 1; ++j)
+			{
+				oldAliens.emplace_back();
+				oldAliens.back().reserve(nx);
+				for (int i = 0; i < nx; ++i)
+				{
+					oldAliens.back().emplace_back(i, j, k);
+				}
+			}
+			initialized = true;
+		}
 
 		for (size_t idx : iZ[iz])
 		{
-			voxel *vit = &vxlSpace[idx];
+			voxel &vit = vxlSpace[idx];
 			calc_distmap(vit, 0, vxls, oldAliens);
 
 			// 控制进度输出频率并避免线程竞争
@@ -903,10 +908,19 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 			{
 				OMPragma("omp critical")
 				{
-					(cout << "\r  distance map / sphere radius = " << vit->R).flush();
+					(cout << "\r  distance map / sphere radius = " << vit.R).flush();
 				}
 			}
-			rBalls += vit->R;
+			rBalls += vit.R;
+		}
+		for (size_t idx : iZ[iz])
+		{
+			voxel &vit = vxlSpace[idx];
+			const int i = vit.i, j = vit.j;
+			node &oldAliens_ = oldAliens[j][i];
+			oldAliens_.i = i;
+			oldAliens_.j = j;
+			oldAliens_.k = k;
 		}
 	}
 	cout << "\n  average distance map = " << rBalls / nVxls << endl;
