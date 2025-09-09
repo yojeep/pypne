@@ -2,6 +2,7 @@
 #include "inputData.h"
 #include "medialSurf.h"
 #include "typses.h"
+#include <atomic>
 
 // #include "medialRadius.cpp"
 
@@ -876,7 +877,10 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	double rBalls = 0.;
 	const int k = -nz / 2 - 1;
 	thread_local std::vector<std::vector<node>> oldAliens;
-	size_t nvxls10th = max(10 * int(vxlSpace.size() / 200), 1);
+	size_t print_interval = max(nz / 10, 1);
+	// 添加全局计数器用于准确跟踪进度
+	std::atomic<int> progress_counter(0);
+	int total_iz = nz;
 	// 使用iZ进行z方向并行处理
 	OMPragma("omp parallel for reduction(+:rBalls) schedule(dynamic)") for (int iz = 0; iz < nz; ++iz)
 	{
@@ -902,16 +906,20 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 		{
 			voxel &vit = vxlSpace[idx];
 			calc_distmap(vit, 0, vxls, oldAliens);
-
-			// 控制进度输出频率并避免线程竞争
-			if (idx % nvxls10th == 0)
-			{
-				OMPragma("omp critical")
-				{
-					(cout << "\r  distance map / sphere radius = " << vit.R).flush();
-				}
-			}
 			rBalls += vit.R;
+		}
+
+		// 原子操作更新进度计数器
+		int current = ++progress_counter;
+		// 控制进度输出频率并避免线程竞争
+		if (current % print_interval == 0 || current == total_iz)
+		{
+			OMPragma("omp critical")
+			{
+				// 使用浮点数计算百分比以提高精度
+				float percentage = (current * 100.0) / total_iz;
+				(cout << "\r distance map calculation progress = " << percentage << "%").flush();
+			}
 		}
 		for (size_t idx : iZ[iz])
 		{
