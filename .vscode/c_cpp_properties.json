@@ -9,7 +9,8 @@
                 "C:/Mingw64/w64devkit/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/backward",
                 "C:/Mingw64/w64devkit/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include",
                 "C:/Mingw64/w64devkit/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed",
-                "C:/Mingw64/w64devkit/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include"
+                "C:/Mingw64/w64devkit/lib/gcc/../../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../include",
+                "C:/Users/yjp/anaconda3/envs/313/include"
             ],
             "defines": [
                 "_DEBUG",
