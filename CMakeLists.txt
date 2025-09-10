@@ -15,19 +15,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++17，否则报错
 
 # add_subdirectory(src/pnm/pnextract)
 find_package(pybind11 REQUIRED)
-pybind11_add_module(pypne_cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/blockNet.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/pypne.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/medialSurf.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vtk.cpp ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vxl.cpp ${CMAKE_SOURCE_DIR}/src/libvoxel/voxelImage.cpp)
+pybind11_add_module(pypne_cpp
+${CMAKE_SOURCE_DIR}/src/pnm/pnextract/blockNet.cpp
+${CMAKE_SOURCE_DIR}/src/pnm/pnextract/pypne.cpp
+${CMAKE_SOURCE_DIR}/src/pnm/pnextract/medialSurf.cpp
+${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vtk.cpp
+${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vxl.cpp
+${CMAKE_SOURCE_DIR}/src/libvoxel/voxelImage.cpp)
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
-target_include_directories(pypne_cpp PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/libvoxel ${CMAKE_SOURCE_DIR}/pybind11/include)
+target_include_directories(pypne_cpp
+PRIVATE
+${CMAKE_SOURCE_DIR}/src/include
+${CMAKE_SOURCE_DIR}/src/libvoxel
+${CMAKE_SOURCE_DIR}/thirdparty/pybind11-3.0.1/include)
 
 if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pypne_cpp PRIVATE -Ofast -Wall)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
-        CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
-        target_link_libraries(pypne_cpp PRIVATE stdc++fs)
-    endif()
 endif()
 
 

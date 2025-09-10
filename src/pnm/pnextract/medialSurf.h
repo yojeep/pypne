@@ -16,11 +16,11 @@ public:
 	class node
 	{
 	public:
-		node() : i(-32768), j(-32768), k(-32768) {};
-		node(const node &v) : i(v.i), j(v.j), k(v.k) {};
-		node(const voxel &v) : i(v.i), j(v.j), k(v.k) {};
-		node(int ii, int jj, int kk) : i(ii), j(jj), k(kk) {};
-		void operator=(const node &v)
+		inline constexpr node() : i(-32768), j(-32768), k(-32768) {};
+		inline node(const node &v) : i(v.i), j(v.j), k(v.k) {};
+		inline node(const voxel &v) : i(v.i), j(v.j), k(v.k) {};
+		inline node(int ii, int jj, int kk) : i(ii), j(jj), k(kk) {};
+		inline void operator=(const node &v)
 		{
 			i = v.i;
 			j = v.j;
