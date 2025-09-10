@@ -28,7 +28,8 @@ target_include_directories(pypne_cpp
 PRIVATE
 ${CMAKE_SOURCE_DIR}/src/include
 ${CMAKE_SOURCE_DIR}/src/libvoxel
-${CMAKE_SOURCE_DIR}/thirdparty/pybind11-3.0.1/include)
+${CMAKE_SOURCE_DIR}/thirdparty/pybind11-3.0.1/include
+${CMAKE_SOURCE_DIR}/thirdparty/boost)
 
 if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)

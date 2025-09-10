@@ -3,7 +3,7 @@
 #include "medialSurf.h"
 #include "typses.h"
 #include <atomic>
-
+#include <boost/multi_array.hpp>
 // #include "medialRadius.cpp"
 
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
