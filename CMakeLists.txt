@@ -4,13 +4,8 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
 project(pypne_project LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
-# set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++17，否则报错
-# set(CMAKE_BUILD_TYPE Release)
-
-# set(CMAKE_BUILD_RPATH $ORIGIN) # 编译时从可执行文件所在目录查找
-# set(CMAKE_INSTALL_RPATH $ORIGIN) # 运行时从可执行文件所在目录查找
-# set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 
 # add_subdirectory(src/pnm/pnextract)
@@ -22,7 +17,6 @@ ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/medialSurf.cpp
 ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vtk.cpp
 ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vxl.cpp
 ${CMAKE_SOURCE_DIR}/src/libvoxel/voxelImage.cpp)
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 target_include_directories(pypne_cpp
 PRIVATE
@@ -42,11 +36,11 @@ endif()
 option(USE_OMP "Enable OpenMP parallelization" ON)
 if(USE_OMP)
     find_package(OpenMP REQUIRED)
-    if(MSVC)
+    if(MSVC)# Do not use!!!
         # MSVC 编译器不支持 OpenMP4.0
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
         # GCC/Clang 使用 -fopenmp
-        target_compile_options(pypne_cpp PRIVATE ${OpenMP_CXX_FLAGS} -DOpenMP)
+        target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS OpenMP)
         target_link_libraries(pypne_cpp PRIVATE OpenMP::OpenMP_CXX)
     endif()
 endif()
