@@ -17,9 +17,9 @@ public:
 	voxel() : ball(nullptr), i(-1), j(-1), k(-1), R(0) {};
 
 public:
+	medialBall *ball;
 	short i, j, k;
 	float R;
-	medialBall *ball;
 };
 
 // class vxlface

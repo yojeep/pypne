@@ -190,7 +190,7 @@ namespace boost {
         }
 
         // an obsolete synonym for fill
-        BOOST_DEPRECATED( "please use `fill` instead" )
+        // BOOST_DEPRECATED( "please use `fill` instead" )
         void assign (const T& value) { fill ( value ); }
 
         // check range (may be private because it is static)
@@ -305,7 +305,7 @@ namespace boost {
         }
 
         // an obsolete synonym for fill
-        BOOST_DEPRECATED( "please use `fill` instead" )
+        // BOOST_DEPRECATED( "please use `fill` instead" )
         void assign (const T& value) { fill ( value ); }
 
         // fill with one value
