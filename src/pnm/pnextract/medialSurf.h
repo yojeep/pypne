@@ -36,7 +36,7 @@ public:
 
 	void calc_distmaps();
 	std::vector<std::vector<size_t>> iZ;
-	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const;
+	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const;
 
 	void buildvoxelspace();
 

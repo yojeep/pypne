@@ -635,7 +635,7 @@ voxelImage segToVxlMesh(const medialSurface &ref)
 	return vxls;
 }
 
-void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<std::vector<node>> &oldAliens) const
+void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const
 {
 
 	const int i = vit.i, j = vit.j, k = vit.k;
@@ -675,7 +675,7 @@ void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelIm
 				}
 				else
 				{
-					const node &nalienOldi = oldAliens[j - 1][i];
+					const node &nalienOldi = oldAliens[(j - 1) * nx + i];
 
 					int neilienDistSqr = (nalienOldi.i - i) * (nalienOldi.i - i) + (nalienOldi.j - j) * (nalienOldi.j - j) + (nalienOldi.k - k) * (nalienOldi.k - k);
 					frz2 = neilienDistSqr + 0.;
@@ -687,7 +687,7 @@ void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelIm
 				}
 			}
 
-			const node &nalienOldi = oldAliens[j][i];
+			const node &nalienOldi = oldAliens[j * nx + i];
 			int neilienDistSqr = (nalienOldi.i - i) * (nalienOldi.i - i) + (nalienOldi.j - j) * (nalienOldi.j - j) + (nalienOldi.k - k) * (nalienOldi.k - k);
 			if (neilienDistSqr < frz2)
 			{
@@ -715,7 +715,7 @@ void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelIm
 		}
 		else
 		{
-			const node &nalienOldi = oldAliens[j - 1][i];
+			const node &nalienOldi = oldAliens[(j - 1) * nx + i];
 
 			int neilienDistSqr = (nalienOldi.i - i) * (nalienOldi.i - i) + (nalienOldi.j - j) * (nalienOldi.j - j) + (nalienOldi.k - k) * (nalienOldi.k - k);
 			frz2 = neilienDistSqr + 0.;
@@ -851,13 +851,13 @@ void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelIm
 			cout << "frz2 " << frz2 << endl;
 			cout << "frz1 " << frz1 << endl;
 			cout << "i " << i << "  j " << j << "  k " << k << endl;
-			cout << "oldAliens[j][i]. i " << oldAliens[j][i].i << "  j " << oldAliens[j][i].j << "  k " << oldAliens[j][i].k << endl;
+			cout << "oldAliens[j,i]. i " << oldAliens[j * nx + i].i << "  j " << oldAliens[j * nx + i].j << "  k " << oldAliens[j * nx + i].k << endl;
 			exit(0);
 		}
 	}
 
 	// OMPragma("omp critical")
-	oldAliens[j][i] = nalien;
+	oldAliens[j * nx + i] = nalien;
 }
 
 void medialSurface::calc_distmaps() // search  MBs at each voxel
@@ -876,7 +876,8 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	voxelImage vxls = segToVxlMesh(*this);
 	double rBalls = 0.;
 	const int k = -nz / 2 - 1;
-	thread_local std::vector<std::vector<node>> oldAliens;
+	// thread_local std::vector<std::vector<node>> oldAliens;
+	thread_local std::vector<node> oldAliens;
 	size_t print_interval = max(nz / 10, 1);
 	// 添加全局计数器用于准确跟踪进度
 	std::atomic<int> progress_counter(0);
@@ -889,16 +890,15 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 		// cout << initialized << endl;
 		if (!initialized)
 		{
-			oldAliens.reserve(ny + 1);
+			oldAliens.reserve(((ny + 1) * nx));
 			for (int j = 0; j < ny + 1; ++j)
-			{
-				oldAliens.emplace_back();
-				oldAliens.back().reserve(nx);
 				for (int i = 0; i < nx; ++i)
 				{
-					oldAliens.back().emplace_back(i, j, k);
+					node &n = oldAliens[j * nx + i];
+					n.i = i;
+					n.j = j;
+					n.k = k;
 				}
-			}
 			initialized = true;
 		}
 
@@ -925,7 +925,7 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 		{
 			voxel &vit = vxlSpace[idx];
 			const int i = vit.i, j = vit.j;
-			node &oldAliens_ = oldAliens[j][i];
+			node &oldAliens_ = oldAliens[j * nx + i];
 			oldAliens_.i = i;
 			oldAliens_.j = j;
 			oldAliens_.k = k;
