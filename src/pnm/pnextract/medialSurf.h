@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <cmath>
 #include <vector>
-
 #include "typses.h"
 #include "inputData.h"
 
@@ -112,7 +111,7 @@ public:
 	size_t nVxls;
 	size_t nBalls;
 
-	std::vector<std::vector<segments>> &segs_;
+	boost::multi_array<segments, 2> &segs_;
 	segment invalidSeg;
 	std::vector<voxel> vxlSpace;
 	std::vector<medialBall> ballSpace;

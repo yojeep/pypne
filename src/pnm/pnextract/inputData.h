@@ -4,7 +4,7 @@
 #include "InputFile.h"
 #include "voxelImage.h"
 #include "ElementGNE.h"
-
+#include <boost/multi_array.hpp>
 using namespace std;
 
 #ifndef PORORANGE_H
@@ -199,7 +199,8 @@ public:
 	{
 
 		stvec<size_t> nVxlVs(_rockTypes.size() + 1, 0);
-		segs_.resize(nz, stvec<segments>(ny));
+		segs_.resize(boost::extents[nz][ny]);
+		// segs_.resize(nz, stvec<segments>(ny));
 
 #ifdef OpenMP
 #pragma omp declare reduction(vec_sizet_plus : std::vector<size_t> : std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<size_t>())) \
@@ -283,8 +284,8 @@ public:
 	long long nInside;
 
 	std::string flowBaseDir;
+	boost::multi_array<segments, 2> segs_;
 
-	stvec<stvec<segments>> segs_;
 	segment invalidSeg;
 
 	stvec<int> segValues;
