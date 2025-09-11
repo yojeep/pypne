@@ -120,6 +120,7 @@
         "stacktrace": "cpp",
         "stdfloat": "cpp",
         "syncstream": "cpp",
-        "mdspan": "cpp"
+        "mdspan": "cpp",
+        "execution": "cpp"
     }
 }

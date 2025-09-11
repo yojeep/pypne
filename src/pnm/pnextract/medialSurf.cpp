@@ -4,6 +4,10 @@
 #include "typses.h"
 #include <atomic>
 #include <boost/multi_array.hpp>
+#include <boost/sort/sort.hpp>
+#include <omp.h>
+
+int omp_threads = omp_get_num_threads();
 // #include "medialRadius.cpp"
 
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
@@ -88,7 +92,7 @@ void medialSurface::buildvoxelspace()
 	vxlSpace.resize(nVxls);
 
 	std::vector<voxel>::iterator p = vxlSpace.begin();
-	const auto vxlBegin = vxlSpace.begin();
+	const std::vector<voxel>::iterator vxlBegin = vxlSpace.begin();
 	iZ.resize(nz);
 	for (int iz = 0; iz < nz; ++iz)
 	{
@@ -205,22 +209,24 @@ void medialSurface::paradoxremoveincludedballI()
 
 	cout << " sorting... ";
 	std::vector<voxel *> tvs;
-	tvs.reserve(nBalls); // allocate memory for void voxels
+	tvs.reserve(nBalls); // 假设 nBalls 是合理的预估值
+	for (voxel &v : vxlSpace)
 	{
-		std::vector<voxel>::iterator ti = vxlSpace.begin() - 1;
-		std::vector<voxel>::iterator tend = vxlSpace.end();
-		while (++ti < tend)
-			if (ti->ball)
-				tvs.push_back(&(*(ti)));
+		if (v.ball)
+		{
+			tvs.push_back(&v);
+		}
 	}
 	cout << tvs.size() << " balls" << endl;
-	sort(tvs.begin(), tvs.end(), metaballcomparer());
+	// sort(tvs.begin(), tvs.end(), metaballcomparer());
+	boost::sort::block_indirect_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
+									 { return a->R > b->R; }, omp_threads);
 
 	cout << " remove included balls:";
 	cout.flush();
 
 	int ndel = 0;
-	auto vpp = tvs.begin(), end = tvs.end();
+	std::vector<voxel *>::iterator vpp = tvs.begin(), end = tvs.end();
 	while (vpp < end)
 	{
 
@@ -1036,7 +1042,10 @@ void medialSurface::smoothRadius()
 
 	{ /// Finally, report max distance map, to confirm that distance map is not changed too much
 		float maxrrr = 0;
-		OMPragma("omp parallel for reduction(max:maxrrr)") for (auto ti = vxlSpace.begin(); ti < vxlSpace.end(); ++ti) maxrrr = max(maxrrr, ti->R);
+		OMPragma("omp parallel for reduction(max:maxrrr)") for (const voxel &v : vxlSpace)
+		{
+			maxrrr = max(maxrrr, v.R);
+		}
 		cout << " maxrrr " << maxrrr << endl;
 	}
 }
@@ -1055,19 +1064,17 @@ void medialSurface::createBallsAndHierarchy()
 
 	nBalls = 0;
 	double rBalls = 0.;
-	std::vector<voxel>::iterator vit = vxlSpace.begin() - 1;
-	const std::vector<voxel>::iterator vend = vxlSpace.end();
-	while (++vit < vend)
+	for (voxel &v : vxlSpace)
 	{
-		if (vit->R >= _minRp)
+		if (v.R >= _minRp)
 		{
-			vit->ball = &(ToBeAssigned);
+			v.ball = &ToBeAssigned;
 			++nBalls;
-			rBalls += vit->R;
+			rBalls += v.R;
 		}
 		else
 		{
-			vit->ball = nullptr;
+			v.ball = nullptr;
 		}
 	}
 	cout << "\n  number of potential maximal spheres: " << nBalls << ",  average radius = " << rBalls / nBalls << endl;
@@ -1081,30 +1088,24 @@ void medialSurface::createBallsAndHierarchy()
 	std::vector<voxel *> tvs;
 	tvs.reserve(nBalls);
 	{
-		std::vector<voxel>::iterator ti = vxlSpace.begin() - 1;
-		std::vector<voxel>::iterator tend = vxlSpace.end();
-		while (++ti < tend)
-			if (ti->ball)
+		for (voxel &v : vxlSpace)
+		{
+			if (v.ball && v.R >= _minRp)
 			{
-				if ((ti->R) >= _minRp)
-					tvs.push_back(&(*(ti)));
-				else
-					cout << "  sdsd ";
+				tvs.push_back(&v);
 			}
-
+		}
+		// sort(tvs.begin(), tvs.end(), metaballcomparer());
+		boost::sort::block_indirect_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
+										 { return a->R > b->R; }, omp_threads);
 		cout << " sorting " << int(tvs.size()) << " maximal balls" << endl;
-		sort(tvs.begin(), tvs.end(), metaballcomparer());
 	}
 
 	ballSpace.reserve(nBalls);
+	for (voxel *v : tvs)
 	{
-		std::vector<voxel *>::iterator ti = tvs.begin() - 1;
-		std::vector<voxel *>::iterator tend = tvs.end();
-		while (++ti < tend)
-		{
-			ballSpace.emplace_back(*ti, 0);
-			(*ti)->ball = &*(ballSpace.rbegin());
-		}
+		ballSpace.emplace_back(v, 0);
+		v->ball = &ballSpace.back();
 	}
 
 	const std::vector<medialBall>::iterator voxend = ballSpace.end();
