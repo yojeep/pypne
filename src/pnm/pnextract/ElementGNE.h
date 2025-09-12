@@ -66,6 +66,44 @@ public:
 			s = nullptr;
 		}
 	}
+	// int fsi(int i) const
+	// {
+	// 	if (cnt <= 0 || i < s[0].start)
+	// 	{
+	// 		return -1;
+	// 	}
+	// 	if (i >= s[cnt].start)
+	// 	{
+	// 		return -1;
+	// 	}
+
+	// 	int left = 0;
+	// 	int right = cnt - 1;
+
+	// 	while (left <= right)
+	// 	{
+	// 		int mid = left + (right - left) / 2;
+
+	// 		if (i >= s[mid].start)
+	// 		{
+	// 			if (i < s[mid + 1].start)
+	// 			{
+	// 				return mid;
+	// 			}
+	// 			else
+	// 			{
+	// 				left = mid + 1;
+	// 			}
+	// 		}
+	// 		else
+	// 		{
+	// 			right = mid - 1;
+	// 		}
+	// 	}
+
+	// 	return -1;
+	// }
+
 	int fsi(int i) const
 	{
 		if (cnt <= 0 || i < s[0].start)
@@ -77,28 +115,23 @@ public:
 			return -1;
 		}
 
-		int left = 0;
-		int right = cnt - 1;
+		int first = 0;
+		int length = cnt + 1;
 
-		while (left <= right)
+		while (length > 0)
 		{
-			int mid = left + (right - left) / 2;
-
-			if (i >= s[mid].start)
+			int rem = length % 2; // 处理奇数长度
+			length /= 2;
+			if (s[first + length].start <= i)
 			{
-				if (i < s[mid + 1].start)
-				{
-					return mid;
-				}
-				else
-				{
-					left = mid + 1;
-				}
+				first += length + rem;
 			}
-			else
-			{
-				right = mid - 1;
-			}
+		}
+		if (first == cnt + 1)
+			return -1;
+		if (--first >= 0)
+		{
+			return first;
 		}
 
 		return -1;

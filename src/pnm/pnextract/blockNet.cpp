@@ -316,8 +316,16 @@ void blockNetwork::CreateVElem(size_t startValue)
 			VElems(bi.fi + 1, bi.fj + 1, bi.fk + 1) = VElems(mastrSphere->fi + 1, mastrSphere->fj + 1, mastrSphere->fk + 1);
 		}
 		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
+		int label = firstPore;
+		for (const auto &bi : balspc)
+		{
+			if (bi.boss == &bi)
+			{
+				VElems(bi.fi + 1, bi.fj + 1, bi.fk + 1) = label;
+				++label;
+			}
+		}
 
-		cout << endl;
 		cout << endl;
 	}
 }
