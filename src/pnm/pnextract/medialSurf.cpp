@@ -141,13 +141,10 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included 
 	{
 		return;
 	}
-
 	cout << " pre-remove included balls: out of " << vxlSpace.size();
 	cout.flush();
-
-	int ndel = 0;
-
-	for (int kk = 0; kk < nz; kk += 2)
+	size_t ndel = 0;
+	OMPragma("omp parallel for collapse(2) schedule(dynamic) reduction(+:ndel)") for (int kk = 0; kk < nz; kk += 2)
 	{
 		for (int jj = 0; jj < ny; jj += 2)
 		{
@@ -156,46 +153,63 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included 
 			{
 				if (s.s[ix].value == 0)
 				{
-					for (int ii = s.s[ix].start; ii < s.s[ix + 1].start; ii += 2)
+					int ii_start = s.s[ix].start;
+					int ii_end = s.s[ix + 1].start;
+					for (int ii = ii_start; ii < ii_end; ii += 2)
 					{
-						voxel *smallers[8] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
-						int counter = -1;
-						float maxRRR = 0;
-						voxel *maxRPV = nullptr;
+						voxel *adjacent[8] = {
+							vxl(ii, jj, kk),
+							vxl(ii + 1, jj, kk),
+							vxl(ii, jj + 1, kk),
+							vxl(ii + 1, jj + 1, kk),
+							vxl(ii, jj, kk + 1),
+							vxl(ii + 1, jj, kk + 1),
+							vxl(ii, jj + 1, kk + 1),
+							vxl(ii + 1, jj + 1, kk + 1)};
 
-						for (int c = 0; c < 2; ++c)
-							for (int b = 0; b < 2; ++b)
-								for (int a = 0; a < 2; ++a)
+						voxel *max_voxel = nullptr;
+						float max_R = 0.0f; // 保存当前最大R值
+						// 查找最大R的体素
+						for (int c = 0; c < 8; ++c)
+						{
+							voxel *&adjacent_i = adjacent[c];
+							if (adjacent_i != nullptr)
+							{
+								if (adjacent_i->ball != nullptr)
 								{
-									voxel *vi = vxl(ii + a, jj + b, kk + c);
-									if (vi != nullptr && vi->ball == &ToBeAssigned)
+									float RRR = adjacent_i->R;
+									if (RRR > max_R)
 									{
-										if (vi->R > maxRRR)
-										{
-											if (maxRPV)
-												smallers[++counter] = maxRPV;
-											maxRRR = vi->R;
-											maxRPV = vi;
-										}
-										else
-										{
-											smallers[++counter] = vi;
-										}
+										max_voxel = adjacent_i;
+										max_R = RRR; // 同时更新max_R
 									}
 								}
-						++counter;
-						ndel += counter;
-						while (counter > 0)
-							if (smallers[--counter])
-							{
-								smallers[counter]->ball = nullptr;
 							}
+						}
+
+						// 设置非最大体素的ball指针
+						if (max_voxel != nullptr)
+						{ // 确保至少有一个有效体素
+							for (int c = 0; c < 8; ++c)
+							{
+								voxel *&adjacent_i = adjacent[c];
+								if (adjacent_i != nullptr)
+								{
+									medialBall *&adjacent_i_ball = adjacent_i->ball;
+
+									if (adjacent_i != max_voxel && adjacent_i_ball != nullptr)
+									{
+										adjacent_i_ball = nullptr;
+										ndel += 1;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
 		}
 	}
-
 	nBalls -= ndel;
 	cout << ",   removed = " << ndel << " remained = " << nBalls << endl;
 }
@@ -222,7 +236,7 @@ void medialSurface::paradoxremoveincludedballI()
 	// sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
 	// 	 { return a->R > b->R; });
 	boost::sort::sample_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-									  { return a->R > b->R; }, omp_threads);
+							 { return a->R > b->R; }, omp_threads);
 
 	cout << " remove included balls:";
 	cout.flush();
@@ -519,8 +533,8 @@ void medialSurface::competeForParent(medialBall *vi, medialBall *vj)
 					vj->boss = vi;
 			}
 
-			if (middlevxl->R >= 0.45 * (ri + rj) - 1.0 && dVal < (ri + rj) * 0.5 + 2.0)
-				makeFriend(vi, vj);
+			// if (middlevxl->R >= 0.45 * (ri + rj) - 1.0 && dVal < (ri + rj) * 0.5 + 2.0)
+			// 	makeFriend(vi, vj);
 		}
 	}
 	else // mvi != mvj
@@ -591,7 +605,7 @@ void medialSurface::competeForParent(medialBall *vi, medialBall *vj)
 				--levelj;
 			}
 
-			makeFriend(vi, vj);
+			// makeFriend(vi, vj);
 		}
 	}
 }
@@ -1066,12 +1080,14 @@ void medialSurface::createBallsAndHierarchy()
 
 	nBalls = 0;
 	double rBalls = 0.;
-	for (voxel &v : vxlSpace)
+	size_t vxlSpace_size = vxlSpace.size();
+	OMPragma("omp parallel for reduction(+:nBalls,rBalls)") for (size_t i = 0; i < vxlSpace_size; ++i)
 	{
+		voxel &v = vxlSpace[i];
 		if (v.R >= _minRp)
 		{
 			v.ball = &ToBeAssigned;
-			++nBalls;
+			nBalls += 1;
 			rBalls += v.R;
 		}
 		else
@@ -1092,7 +1108,7 @@ void medialSurface::createBallsAndHierarchy()
 	{
 		for (voxel &v : vxlSpace)
 		{
-			if (v.ball && v.R >= _minRp)
+			if (v.ball)
 			{
 				tvs.push_back(&v);
 			}
@@ -1100,7 +1116,7 @@ void medialSurface::createBallsAndHierarchy()
 		// sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
 		// 	 { return a->R > b->R; });
 		boost::sort::sample_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-										  { return a->R > b->R; }, omp_threads);
+								 { return a->R > b->R; }, omp_threads);
 		cout << " sorting " << int(tvs.size()) << " maximal balls" << endl;
 	}
 
@@ -1111,40 +1127,36 @@ void medialSurface::createBallsAndHierarchy()
 		v->ball = &ballSpace.back();
 	}
 
-	const std::vector<medialBall>::iterator voxend = ballSpace.end();
+	// const std::vector<medialBall>::iterator voxend = ballSpace.end();
 
+	OMPFor() for (size_t i = 0; i < nBalls; ++i)
 	{
-		std::vector<medialBall>::iterator vi = ballSpace.begin() - 1;
-		while (++vi != voxend)
-			moveUphill(&*vi);
-	}
-	{
-		std::vector<medialBall>::iterator vi = ballSpace.begin() - 1;
-		while (++vi != voxend)
-			moveUphillp1(&*vi);
+		moveUphill(&ballSpace[i]);
 	}
 
+	for (size_t i = 0; i < nBalls; ++i)
 	{
-		std::vector<medialBall>::iterator vi = ballSpace.begin() - 1;
-		while (++vi != voxend)
-			moveUphill(&*vi);
+		moveUphillp1(&ballSpace[i]);
+	}
+
+	
+
+	OMPFor() for (size_t i = 0; i < nBalls; ++i)
+	{
+		moveUphill(&ballSpace[i]);
 	}
 
 	cout << " creating ball hierarchy:";
 	cout.flush();
-	const std::vector<medialBall>::iterator voxp = ballSpace.begin();
+
+	for (size_t i = 0; i < nBalls; ++i)
 	{
-		std::vector<medialBall>::iterator vi = ballSpace.begin();
-		while (vi != voxend)
+		findBoss(&ballSpace[i]); // 直接使用索引访问
+		if (i % 100000 == 0)	 // 每 100,000 个球打印一次进度
 		{
-			findBoss(&*vi);
-			if ((vi - voxp) % 100000 == 0)
-			{
-				cout << "\r   ball: " << int(vi - voxp);
-				cout.flush();
-			}
-			++vi;
+			cout << "\r   ball: " << i;
+			cout.flush();
 		}
-		cout << "\r   ball: " << int(vi - voxp) << endl;
 	}
+	cout << "\r   ball: " << nBalls << endl; // 最后打印总数
 }

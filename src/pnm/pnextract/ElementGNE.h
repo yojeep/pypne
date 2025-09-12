@@ -66,13 +66,53 @@ public:
 			s = nullptr;
 		}
 	}
+	int fsi(int i) const
+	{
+		if (cnt <= 0 || i < s[0].start)
+		{
+			return -1;
+		}
+		if (i >= s[cnt].start)
+		{
+			return -1;
+		}
+
+		int left = 0;
+		int right = cnt - 1;
+
+		while (left <= right)
+		{
+			int mid = left + (right - left) / 2;
+
+			if (i >= s[mid].start)
+			{
+				if (i < s[mid + 1].start)
+				{
+					return mid;
+				}
+				else
+				{
+					left = mid + 1;
+				}
+			}
+			else
+			{
+				right = mid - 1;
+			}
+		}
+
+		return -1;
+	}
 
 	voxel *vxl(int i) const
 	{
-		for (int p = 0; p < cnt; ++p)
-			if (i >= s[p].start && i < s[p + 1].start)
-				return s[p].v(i);
-		return nullptr;
+		int p = fsi(i);
+		if (p != -1)
+			return s[p].v(i);
+		else
+		{
+			return nullptr;
+		}
 	}
 
 	segment *s;

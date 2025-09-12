@@ -55,9 +55,11 @@ public:
 			return nullptr;
 
 		segments &s = segs_[k][j];
-		for (int p = 0; p < s.cnt; ++p)
-			if ((i >= s.s[p].start) && (i < s.s[p + 1].start))
-				return (0 == s.s[p].value) ? (s.s[p].segV + (i - s.s[p].start)) : nullptr;
+		int p = s.fsi(i);
+		if (p != -1)
+		{
+			return (0 == s.s[p].value) ? (s.s[p].segV + (i - s.s[p].start)) : nullptr;
+		}
 		return nullptr;
 	}
 
@@ -67,10 +69,9 @@ public:
 			return invalidSeg;
 
 		const segments &s = segs_[k][j];
-		for (int p = 0; p < s.cnt; ++p)
-			if (i >= s.s[p].start && i < s.s[p + 1].start)
-				return (s.s[p]);
-
+		int p = s.fsi(i);
+		if (p != -1)
+			return (s.s[p]);
 		cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
 		return (s.s[s.cnt]);
 	}
@@ -81,9 +82,9 @@ public:
 			return invalidSeg;
 
 		const segments &s = segs_[k][j];
-		for (int p = 0; p < s.cnt; ++p)
-			if (i >= s.s[p].start && i < s.s[p + 1].start)
-				return (s.s[p + 1]);
+		int p = s.fsi(i);
+		if (p != -1)
+			return (s.s[p + 1]);
 
 		cout << "Error can not find next segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
 		return (s.s[s.cnt]);
