@@ -229,7 +229,8 @@ public:
 
 				segments &ss = segs_[iz][iy];
 				ss.cnt = cnt;
-				ss.reSize(cnt + 1);
+				ss.cntp1 = cnt + 1;
+				ss.reSize(ss.cntp1);
 				if (segs_[iz][iy].s == nullptr)
 				{
 					cout << "\n   iz " << iz << " iy " << iy << " cnt" << cnt << " ERROR XX XX" << endl;
@@ -244,6 +245,7 @@ public:
 				}
 				ss.s[cnt].start = nx;
 				ss.s[cnt].value = 254;
+				ss.initial_starts();
 			}
 		}
 
@@ -265,9 +267,9 @@ public:
 			return &invalidSeg;
 
 		const segments &s = segs_[k][j];
-		for (int p = 0; p < s.cnt; ++p)
-			if (i >= s.s[p].start && i < s.s[p + 1].start)
-				return s.s + p;
+		int p = s.fsi(i);
+		if (p!=-1)
+			return s.s + p;
 
 		cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
 		return (s.s + s.cnt);

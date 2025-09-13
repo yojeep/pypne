@@ -664,8 +664,7 @@ void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelIm
 
 	node nalien(i, j, -nz);
 
-	int
-		epxMax = 2 * nx;
+	int epxMax = 2 * nx;
 
 	double frz2 = epxMax * epxMax;
 	int frz1 = 2, fry1 = 0;
@@ -1138,8 +1137,6 @@ void medialSurface::createBallsAndHierarchy()
 	{
 		moveUphillp1(&ballSpace[i]);
 	}
-
-	
 
 	OMPFor() for (size_t i = 0; i < nBalls; ++i)
 	{

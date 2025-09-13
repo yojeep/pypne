@@ -5,7 +5,6 @@
 #include <map>
 #include <iostream>
 #include <array>
-
 const static int LEVEL_MAX = 32767;
 #define nAprox 1
 
@@ -46,7 +45,7 @@ public:
 class segments
 {
 public:
-	segments() : s(nullptr), cnt(0) {};
+	segments() : cnt(0), cntp1(0), s(nullptr), starts(nullptr) {};
 	void reSize(int size)
 	{
 		if (!s)
@@ -54,87 +53,60 @@ public:
 		else
 		{
 			std::cout << " \nError in segments " << size_t(s) << std::endl;
+			delete[] s;
 			s = new segment[size];
+		}
+		if (!starts)
+		{
+			starts = new int[size];
+		}
+		else
+		{
+			std::cout << " \nError in segments " << size_t(starts) << std::endl;
+			delete[] starts;
+			starts = new int[size];
 		}
 	}
 
 	~segments()
 	{
-		if (s && cnt)
+		if (s)
 		{
 			delete[] s;
 			s = nullptr;
 		}
+		if (starts)
+		{
+			delete[] starts;
+			starts = nullptr;
+		}
 	}
-	// int fsi(int i) const
-	// {
-	// 	if (cnt <= 0 || i < s[0].start)
-	// 	{
-	// 		return -1;
-	// 	}
-	// 	if (i >= s[cnt].start)
-	// 	{
-	// 		return -1;
-	// 	}
-
-	// 	int left = 0;
-	// 	int right = cnt - 1;
-
-	// 	while (left <= right)
-	// 	{
-	// 		int mid = left + (right - left) / 2;
-
-	// 		if (i >= s[mid].start)
-	// 		{
-	// 			if (i < s[mid + 1].start)
-	// 			{
-	// 				return mid;
-	// 			}
-	// 			else
-	// 			{
-	// 				left = mid + 1;
-	// 			}
-	// 		}
-	// 		else
-	// 		{
-	// 			right = mid - 1;
-	// 		}
-	// 	}
-
-	// 	return -1;
-	// }
-
+	void initial_starts()
+	{
+		for (int i = 0; i < cntp1; i++)
+		{
+			starts[i] = s[i].start;
+		}
+	}
 	int fsi(int i) const
 	{
-		if (cnt <= 0 || i < s[0].start)
+		if (cnt <= 0 || i < starts[0] || i >= starts[cnt])
 		{
 			return -1;
 		}
-		if (i >= s[cnt].start)
-		{
-			return -1;
-		}
-
 		int first = 0;
-		int length = cnt + 1;
-
+		int length = cntp1;
+		int rem;
 		while (length > 0)
 		{
-			int rem = length % 2; // 处理奇数长度
-			length /= 2;
-			if (s[first + length].start <= i)
+			rem = length & 1; // 处理奇数长度
+			length >>= 1;
+			if (starts[first + length] <= i)
 			{
 				first += length + rem;
 			}
 		}
-		if (first == cnt + 1)
-			return -1;
-		if (--first >= 0)
-		{
-			return first;
-		}
-
-		return -1;
+		return --first;
 	}
 
 	voxel *vxl(int i) const
@@ -147,9 +119,10 @@ public:
 			return nullptr;
 		}
 	}
-
-	segment *s;
 	int cnt;
+	int cntp1;
+	segment *s;
+	int *starts;
 };
 
 #define _mp5 -0.5
