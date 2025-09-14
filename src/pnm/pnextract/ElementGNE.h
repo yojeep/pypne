@@ -94,19 +94,16 @@ public:
 		{
 			return -1;
 		}
-		int first = 0;
+		const int *first = &starts[0];
 		int length = cntp1;
-		int rem;
 		while (length > 0)
 		{
-			rem = length & 1; // 处理奇数长度
-			length >>= 1;
-			if (starts[first + length] <= i)
-			{
-				first += length + rem;
-			}
+			int half = length >> 1;
+			// gcc generates a cmov with a multiply instead of a ternary conditional
+			first += (first[half] <= i) * (length - half);
+			length = half;
 		}
-		return --first;
+		return first - starts - 1;
 	}
 
 	voxel *vxl(int i) const
