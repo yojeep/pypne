@@ -5,7 +5,6 @@
 #include <map>
 #include <iostream>
 #include <array>
-#include <immintrin.h>
 const static int LEVEL_MAX = 32767;
 #define nAprox 1
 
@@ -59,13 +58,13 @@ public:
 		}
 		if (!starts)
 		{
-			starts = new (std::align_val_t{16}) int[size];
+			starts = new int[size];
 		}
 		else
 		{
 			std::cout << " \nError in segments " << size_t(starts) << std::endl;
 			delete[] starts;
-			starts = new (std::align_val_t{16}) int[size];
+			starts = new int[size];
 		}
 	}
 
@@ -78,8 +77,7 @@ public:
 		}
 		if (starts)
 		{
-			// delete[] starts;
-			::operator delete(starts, std::align_val_t{16});
+			delete[] starts;
 			starts = nullptr;
 		}
 	}
@@ -90,8 +88,12 @@ public:
 			starts[i] = s[i].start;
 		}
 	}
-	int fsi_binary_search(int i) const
+	int fsi(int i) const
 	{
+		if (cnt <= 0 || i < starts[0] || i >= starts[cnt])
+		{
+			return -1;
+		}
 		int first = 0;
 		int length = cntp1;
 		int rem;
@@ -104,53 +106,9 @@ public:
 				first += length + rem;
 			}
 		}
-		return first;
+		return --first;
 	}
 
-	int fsi_linear_search(int i) const
-	{
-		__m128i v_i = _mm_set1_epi32(i);
-
-		// 主循环：每次处理 4 个元素，确保 p + 4 <= cntp1
-		int p = 0;
-		for (; p + 4 <= cntp1; p += 4)
-		{
-			__m128i v_starts = _mm_load_si128((__m128i *)&starts[p]);
-			__m128i cmp = _mm_cmpgt_epi32(v_starts, v_i);
-			int mask = _mm_movemask_ps(_mm_castsi128_ps(cmp));
-			if (mask != 0)
-			{
-				int index = __builtin_ctz(mask);
-				return p + index;
-			}
-		}
-
-		// 处理剩余 1~3 个元素（避免越界）
-		for (; p < cntp1; p++)
-		{
-			if (starts[p] > i)
-			{
-				return p;
-			}
-		}
-		return -1;
-	}
-
-	int fsi(int i) const
-	{
-		if (cnt <= 0 || i < starts[0] || i >= starts[cnt])
-		{
-			return -1;
-		}
-		if (cnt < 500)
-		{
-			return fsi_linear_search(i) - 1;
-		}
-		else
-		{
-			return fsi_binary_search(i) - 1;
-		}
-	}
 	voxel *vxl(int i) const
 	{
 		int p = fsi(i);
