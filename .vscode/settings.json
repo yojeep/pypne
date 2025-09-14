@@ -122,6 +122,7 @@
         "syncstream": "cpp",
         "mdspan": "cpp",
         "execution": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "climits": "cpp"
     }
 }

@@ -88,22 +88,44 @@ public:
 			starts[i] = s[i].start;
 		}
 	}
-	int fsi(int i) const
+	int fsi_binary(const int i) const
 	{
-		if (cnt <= 0 || i < starts[0] || i >= starts[cnt])
-		{
-			return -1;
-		}
-		const int *first = &starts[0];
+		int index = 0;
 		int length = cntp1;
 		while (length > 0)
 		{
 			int half = length >> 1;
-			// gcc generates a cmov with a multiply instead of a ternary conditional
-			first += (first[half] <= i) * (length - half);
+			index += (starts[index + half] <= i) * (length - half);
 			length = half;
 		}
-		return first - starts - 1;
+		return --index;
+	}
+
+	int fsi_linear(const int i) const
+	{
+		int index = 0;
+		while (starts[index] <= i)
+		{
+			++index;
+		}
+		return --index;
+	}
+	int fsi(const int i) const
+	{
+		int index = -1;
+		if (cnt <= 0 || i < starts[0] || i >= starts[cnt])
+		{
+			return index;
+		}
+		if (cnt > 0)
+		{
+			index = fsi_binary(i);
+		}
+		else
+		{
+			index = fsi_linear(i);
+		}
+		return index;
 	}
 
 	voxel *vxl(int i) const
