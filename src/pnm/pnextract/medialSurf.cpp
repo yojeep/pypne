@@ -6,8 +6,6 @@
 #include <boost/multi_array.hpp>
 #include <boost/sort/sort.hpp>
 #include <omp.h>
-
-int omp_threads = omp_get_num_threads();
 // #include "medialRadius.cpp"
 
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
@@ -236,7 +234,7 @@ void medialSurface::paradoxremoveincludedballI()
 	// sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
 	// 	 { return a->R > b->R; });
 	boost::sort::sample_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-							 { return a->R > b->R; }, omp_threads);
+							 { return a->R > b->R; }, omp_get_num_threads());
 
 	cout << " remove included balls:";
 	cout.flush();
@@ -619,13 +617,13 @@ void medialSurface::findBoss(medialBall *vi)
 	for (float xpa = 2. * x - ex; xpa <= ex; xpa += 1.0f)
 	{
 		float remain_y = ripp * ripp - (xpa - x) * (xpa - x);
-		if (remain_y < 0.f)
+		if (remain_y <= 0.f)
 			continue;
 		float ey = y + sqrt(remain_y);
 		for (float ypb = 2. * y - ey; ypb <= ey; ypb += 1.0f)
 		{
 			float remain_z = remain_y - (y - ypb) * (y - ypb);
-			if (remain_z < 0.f)
+			if (remain_z <= 0.f)
 				continue;
 			float ez = z + sqrt(remain_z);
 			for (float zpc = 2. * z - ez; zpc <= ez; zpc += 1.0f)
@@ -1115,7 +1113,7 @@ void medialSurface::createBallsAndHierarchy()
 		// sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
 		// 	 { return a->R > b->R; });
 		boost::sort::sample_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-								 { return a->R > b->R; }, omp_threads);
+								 { return a->R > b->R; }, omp_get_num_threads());
 		cout << " sorting " << int(tvs.size()) << " maximal balls" << endl;
 	}
 

@@ -152,13 +152,13 @@ void blockNetwork::CreateVElem(size_t startValue)
 				for (float xpa = max((x - ex), 0.5f); xpa <= min((x + ex), cg.nx - 0.5f); xpa += 1.0f)
 				{
 					float remain_y = r2 - (xpa - x) * (xpa - x);
-					if (remain_y < 0.f)
+					if (remain_y <= 0.f)
 						continue;
 					float ey = std::sqrt(remain_y);
 					for (float ypb = max((y - ey), 0.5f); ypb <= min((y + ey), cg.ny - 0.5f); ypb += 1.0f)
 					{
 						float remain_z = remain_y - (ypb - y) * (ypb - y);
-						if (remain_z < 0.f)
+						if (remain_z <= 0.f)
 							continue;
 						float ez = std::sqrt(remain_z);
 						for (float zpc = max((z - ez), 0.5f); zpc <= min((z + ez), cg.nz - 0.5f); zpc += 1.0f)
