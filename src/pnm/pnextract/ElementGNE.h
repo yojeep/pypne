@@ -117,7 +117,7 @@ public:
 		{
 			return index;
 		}
-		if (cnt >26)
+		if (cnt >30)
 		{
 			index = fsi_binary(i);
 		}
