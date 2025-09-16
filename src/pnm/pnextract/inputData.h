@@ -79,7 +79,7 @@ inline int createSample_input_nextract(std::string fnam, std::string opts)
 		   << "// write_poreMaxBalls:	true\n"
 		   << "// write_throatMaxBalls:	true\n"
 		   << "// write_throats:	true\n"
-		   //<<"// write_poroats:	true\n" // leads to seg fault
+		   //<<"// write_poroats:	true\n" // results in seg fault
 		   << "// write_hierarchy:	true\n"
 		   << "// write_medialSurface:	true\n"
 		   << "// write_throatHierarchy:	true\n"
@@ -268,7 +268,7 @@ public:
 
 		const segments &s = segs_[k][j];
 		int p = s.fsi(i);
-		if (p!=-1)
+		if (p != -1)
 			return s.s + p;
 
 		cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
