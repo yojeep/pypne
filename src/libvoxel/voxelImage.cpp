@@ -1005,8 +1005,8 @@ void voxelImageT<T>::readFromHeader(istream &hdrFile, const string &hdrNam, int 
 		if (hasExt(inputName, 4, ".tif"))
 		{
 			dbl3 dx = vImg.dx_, X0 = vImg.X0_;
-			bool readingImage = vImg.readBin(inputName);
-			assert(readingImage);
+			// bool readingImage = vImg.readBin(inputName);
+			// assert(readingImage);
 			if (X0read)
 				vImg.X0_ = X0;
 			if (dxread)
@@ -1014,16 +1014,16 @@ void voxelImageT<T>::readFromHeader(istream &hdrFile, const string &hdrNam, int 
 		}
 		else if ((hasExt(inputName, 4, ".raw") && BinaryData != "False") || BinaryData == "True")
 		{
-			bool readingImage = vImg.readBin(inputName, nSkipBytes);
-			assert(readingImage);
+			// bool readingImage = vImg.readBin(inputName, nSkipBytes);
+			// assert(readingImage);
 		}
 		else if (hasExt(inputName, 3, ".am"))
 		{
 			int RLECompressed;
 			dbl3 dx = vImg.dx_, X0 = vImg.X0_;
 			getAmiraHeaderSize(inputName, nnn, vImg.dx_, vImg.X0_, nSkipBytes, RLECompressed);
-			bool readingImage = vImg.readBin(inputName, nSkipBytes);
-			assert(readingImage);
+			// bool readingImage = vImg.readBin(inputName, nSkipBytes);
+			// assert(readingImage);
 			if (X0read)
 				vImg.X0_ = X0;
 			if (dxread)
@@ -1031,8 +1031,8 @@ void voxelImageT<T>::readFromHeader(istream &hdrFile, const string &hdrNam, int 
 		}
 		else if (hasExt(inputName, 7, ".raw.gz"))
 		{
-			bool readingImage = vImg.readBin(inputName);
-			assert(readingImage);
+			// bool readingImage = vImg.readBin(inputName);
+			// assert(readingImage);
 		}
 		else
 		{
