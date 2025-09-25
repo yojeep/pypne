@@ -6,8 +6,8 @@
 #include <iostream>
 #include <array>
 const static int LEVEL_MAX = 32767;
-#define nAprox 1
-
+inline int nAprox(1);
+inline float _mp5(-0.5);
 class medialBall;
 class voxel
 {
@@ -117,7 +117,7 @@ public:
 		{
 			return index;
 		}
-		if (cnt >30)
+		if (cnt > 30)
 		{
 			index = fsi_binary(i);
 		}
@@ -144,7 +144,7 @@ public:
 	int *starts;
 };
 
-#define _mp5 -0.5
+// #define _mp5 -0.5;
 
 /// maximal-sphere class, describing spheres, which are generated for voxels on the medial surface
 class medialBall
@@ -406,17 +406,26 @@ public:
 
 inline double distSqr(const medialBall *i, const medialBall *j)
 {
-	return (i->fi - j->fi) * (i->fi - j->fi) + (i->fj - j->fj) * (i->fj - j->fj) + (i->fk - j->fk) * (i->fk - j->fk);
+	const double dx = i->fi - j->fi;
+	const double dy = i->fj - j->fj;
+	const double dz = i->fk - j->fk;
+	return dx * dx + dy * dy + dz * dz;
 }
 
 inline double distSqr(const medialBall *i, const voxel *j)
 {
-	return (i->fi - j->i - _mp5) * (i->fi - j->i - _mp5) + (i->fj - j->j - _mp5) * (i->fj - j->j - _mp5) + (i->fk - j->k - _mp5) * (i->fk - j->k - _mp5);
+	const double dx = i->fi - j->i - _mp5;
+	const double dy = i->fj - j->j - _mp5;
+	const double dz = i->fk - j->k - _mp5;
+	return dx * dx + dy * dy + dz * dz;
 }
 
 inline double distSqr(const voxel &i, const voxel &j)
 {
-	return (i.i - j.i) * (i.i - j.i) + (i.j - j.j) * (i.j - j.j) + (i.k - j.k) * (i.k - j.k);
+	const int dx = i.i - j.i;
+	const int dy = i.j - j.j;
+	const int dz = i.k - j.k;
+	return dx * dx + dy * dy + dz * dz;
 }
 
 class metaballcomparer
@@ -426,6 +435,9 @@ public:
 };
 inline double dist(const medialBall *i, const medialBall *j)
 {
-	return sqrt(double((i->fi - j->fi) * (i->fi - j->fi) + (i->fj - j->fj) * (i->fj - j->fj) + (i->fk - j->fk) * (i->fk - j->fk)));
+	const double dx = i->fi - j->fi;
+	const double dy = i->fj - j->fj;
+	const double dz = i->fk - j->fk;
+	return sqrt(dx * dx + dy * dy + dz * dz);
 }
 #endif

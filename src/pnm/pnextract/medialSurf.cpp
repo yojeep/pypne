@@ -5,7 +5,6 @@
 #include <atomic>
 #include <boost/multi_array.hpp>
 #include <boost/sort/sort.hpp>
-#include <omp.h>
 // #include "medialRadius.cpp"
 
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
@@ -18,10 +17,10 @@ medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double cro
 	nz = cfg.nz;
 
 	size_t nvoxls = 0; // local copy for omp
-	OMPragma("omp parallel for reduction(+:nvoxls)") for (short k = 0; k < nz; ++k) for (short j = 0; j < ny; ++j)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nvoxls)") for (int k = 0; k < nz; ++k) for (int j = 0; j < ny; ++j)
 	{
 		const segments &s = cg_.segs_[k][j];
-		for (short ix = 0; ix < s.cnt; ++ix)
+		for (int ix = 0; ix < s.cnt; ++ix)
 			if (s.s[ix].value == 0)
 				nvoxls += s.s[ix + 1].start - s.s[ix].start;
 	}
@@ -142,7 +141,7 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included 
 	cout << " pre-remove included balls: out of " << vxlSpace.size();
 	cout.flush();
 	size_t ndel = 0;
-	OMPragma("omp parallel for collapse(2) schedule(dynamic) reduction(+:ndel)") for (int kk = 0; kk < nz; kk += 2)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:ndel)") for (int kk = 0; kk < nz; kk += 2)
 	{
 		for (int jj = 0; jj < ny; jj += 2)
 		{
@@ -198,7 +197,7 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included 
 									if (adjacent_i != max_voxel && adjacent_i_ball != nullptr)
 									{
 										adjacent_i_ball = nullptr;
-										ndel += 1;
+										++ndel;
 									}
 								}
 							}
@@ -239,7 +238,7 @@ void medialSurface::paradoxremoveincludedballI()
 	cout << " remove included balls:";
 	cout.flush();
 
-	int ndel = 0;
+	size_t ndel = 0;
 	std::vector<voxel *>::iterator vpp = tvs.begin(), end = tvs.end();
 	while (vpp < end)
 	{
@@ -641,7 +640,7 @@ void medialSurface::findBoss(medialBall *vi)
 voxelImage segToVxlMesh(const medialSurface &ref)
 { /// converts segments back to voxelImage
 	voxelImage vxls(ref.nx, ref.ny, ref.nz, 255);
-	OMPFor() for (int iz = 0; iz < ref.nz; ++iz)
+	OMPragma("omp parallel for collapse(2) schedule(static)") for (int iz = 0; iz < ref.nz; ++iz)
 	{
 		for (int iy = 0; iy < ref.ny; ++iy)
 		{
@@ -875,7 +874,6 @@ void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelIm
 		}
 	}
 
-	// OMPragma("omp critical")
 	oldAliens[j * nx + i] = nalien;
 }
 
@@ -907,7 +905,7 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	size_t progress_counter(0);
 	size_t total_iz = nz;
 	// 使用iZ进行z方向并行处理
-	OMPragma("omp parallel for reduction(+:rBalls) reduction(+:progress_counter) firstprivate(oldAliens) schedule(dynamic)") for (int iz = 0; iz < nz; ++iz)
+	OMPragma("omp parallel for schedule(guided) reduction(+:rBalls,progress_counter) firstprivate(oldAliens)") for (int iz = 0; iz < nz; ++iz)
 	{
 		for (size_t idx : iZ[iz])
 		{
@@ -946,7 +944,7 @@ void medialSurface::smoothRadius()
 
 	std::vector<float> delRrr(vxlSpace.size(), 0.0f);
 	(cout << "*").flush();
-	OMPFor() for (int k = 0; k < nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static)") for (int k = 0; k < nz; ++k)
 	{
 		for (int j = 0; j < ny; ++j)
 		{
@@ -989,7 +987,7 @@ void medialSurface::smoothRadius()
 	}
 	(cout << "*").flush();
 
-	OMPFor() for (int k = 0; k < nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static)") for (int k = 0; k < nz; ++k)
 	{
 		for (int j = 0; j < ny; ++j)
 		{
@@ -1034,7 +1032,7 @@ void medialSurface::smoothRadius()
 
 	{ /// Finally, report max distance map, to confirm that distance map is not changed too much
 		float maxrrr = 0;
-		OMPragma("omp parallel for reduction(max:maxrrr)") for (const voxel &v : vxlSpace)
+		OMPragma("omp parallel for schedule(static) reduction(max:maxrrr)") for (const voxel &v : vxlSpace)
 		{
 			maxrrr = max(maxrrr, v.R);
 		}
@@ -1057,13 +1055,13 @@ void medialSurface::createBallsAndHierarchy()
 	nBalls = 0;
 	double rBalls = 0.;
 	size_t vxlSpace_size = vxlSpace.size();
-	OMPragma("omp parallel for reduction(+:nBalls,rBalls)") for (size_t i = 0; i < vxlSpace_size; ++i)
+	OMPragma("omp parallel for schedule(static) reduction(+:nBalls,rBalls)") for (size_t i = 0; i < vxlSpace_size; ++i)
 	{
 		voxel &v = vxlSpace[i];
 		if (v.R >= _minRp)
 		{
 			v.ball = &ToBeAssigned;
-			nBalls += 1;
+			++nBalls;
 			rBalls += v.R;
 		}
 		else
@@ -1105,7 +1103,7 @@ void medialSurface::createBallsAndHierarchy()
 
 	// const std::vector<medialBall>::iterator voxend = ballSpace.end();
 
-	OMPFor() for (size_t i = 0; i < nBalls; ++i)
+	OMPragma("omp parallel for schedule(static)") for (size_t i = 0; i < nBalls; ++i)
 	{
 		moveUphill(&ballSpace[i]);
 	}
@@ -1115,7 +1113,7 @@ void medialSurface::createBallsAndHierarchy()
 		moveUphillp1(&ballSpace[i]);
 	}
 
-	OMPFor() for (size_t i = 0; i < nBalls; ++i)
+	OMPragma("omp parallel for schedule(static)") for (size_t i = 0; i < nBalls; ++i)
 	{
 		moveUphill(&ballSpace[i]);
 	}

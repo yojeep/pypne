@@ -7,7 +7,7 @@
 #include <memory>
 #include <map>
 #include <filesystem> // Include the standard filesystem header
-int num_workers(1);
+inline int num_workers(1);
 namespace fs = std::filesystem; // Create an alias for convenience
 
 inline std::string getpwd() { return fs::current_path().string(); }

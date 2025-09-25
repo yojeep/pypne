@@ -207,7 +207,7 @@ public:
 	initializer(omp_priv = omp_orig)
 #endif
 
-		OMPragma("omp parallel for  reduction(vec_sizet_plus : nVxlVs)") for (int iz = 0; iz < nz; ++iz)
+		OMPragma("omp parallel for schedule(static) reduction(vec_sizet_plus:nVxlVs)") for (int iz = 0; iz < nz; ++iz)
 		{
 			stvec<segment> segTmp(nx + 1);
 			for (int iy = 0; iy < ny; ++iy)

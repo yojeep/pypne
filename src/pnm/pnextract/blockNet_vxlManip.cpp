@@ -14,7 +14,7 @@ unsigned int growPores_X2(voxelField<int> &VElems, int bgn, int lst, int porValu
 	long long nChanges(0);
 	{
 		voxelField<int> voxls = VElems;
-		OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < int(voxls.nz()) - 1; ++k)
+		OMPragma("omp parallel for collapse(3) schedule(static) reduction(+:nChanges)") for (int k = 1; k < int(voxls.nz()) - 1; ++k)
 		{
 			for (int j = 1; j < int(voxls.ny()) - 1; ++j)
 				for (int i = 1; i < int(voxls.nx()) - 1; ++i)
@@ -60,7 +60,7 @@ unsigned int growPores_X2(voxelField<int> &VElems, int bgn, int lst, int porValu
 	nChanges = 0;
 	{
 		voxelField<int> voxls = VElems;
-		OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < voxls.nz() - 1; ++k)
+		OMPragma("omp parallel for collapse(3) schedule(static) reduction(+:nChanges)") for (int k = 1; k < voxls.nz() - 1; ++k)
 		{
 			for (int j = 1; j < voxls.ny() - 1; ++j)
 				for (int i = 1; i < voxls.nx() - 1; ++i)
@@ -106,7 +106,7 @@ unsigned int growPores_X2(voxelField<int> &VElems, int bgn, int lst, int porValu
 	nChanges = 0;
 	{
 		voxelField<int> voxls = VElems;
-		OMPragma("omp parallel for reduction(+:nChanges)") for (int k = voxls.nz() - 2; k >= 1; --k)
+		OMPragma("omp parallel for collapse(3) schedule(static) reduction(+:nChanges)") for (int k = voxls.nz() - 2; k >= 1; --k)
 		{
 			for (int j = voxls.ny() - 2; j >= 1; --j)
 				for (int i = voxls.nx() - 2; i >= 1; --i)
@@ -158,7 +158,7 @@ void growPores(voxelField<int> &VElems, int bgn, int lst, int porValue)
 	const voxelField<int> voxls = VElems;
 	long long nChanges(0);
 
-	OMPragma("omp parallel for reduction(+:nChanges)") for (int k = 1; k < int(voxls.nz()) - 1; ++k)
+	OMPragma("omp parallel for collapse(3) schedule(static) reduction(+:nChanges)") for (int k = 1; k < int(voxls.nz()) - 1; ++k)
 	{
 		for (int j = 1; j < int(voxls.ny()) - 1; ++j)
 			for (int i = 1; i < int(voxls.nx()) - 1; ++i)
@@ -208,7 +208,7 @@ void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, long bgn
 
 	voxelField<int> voxls = VElems;
 	long long nChanges(0);
-	OMPragma("omp parallel for reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
 	{
 		for (short j = 1; j <= cg.ny; ++j)
 		{
@@ -269,7 +269,7 @@ void growPoresMedStrict(const inputDataNE &cg, voxelField<int> &VElems, long bgn
 
 	voxelField<int> voxls = VElems;
 	long long nChanges(0);
-	OMPragma("omp parallel for reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
 	{
 		for (short j = 1; j <= cg.ny; ++j)
 		{
@@ -344,7 +344,7 @@ void growPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, long bgn, l
 
 	const voxelField<int> voxls = VElems;
 	long long nChanges(0);
-	OMPragma("omp parallel for reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
 	{
 		for (short j = 1; j <= cg.ny; ++j)
 		{
@@ -423,7 +423,7 @@ void growPoresMedEqs(const inputDataNE &cg, voxelField<int> &VElems, long bgn, l
 
 	const voxelField<int> voxls = VElems;
 	long long nChanges(0);
-	OMPragma("omp parallel for reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
 	{
 		for (short j = 1; j <= cg.ny; ++j)
 		{
@@ -502,7 +502,7 @@ void growPoresMedEqsLoose(const inputDataNE &cg, voxelField<int> &VElems, long b
 
 	voxelField<int> voxls = VElems;
 	long long nChanges(0);
-	OMPragma("omp parallel for reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
 	{
 		for (short j = 1; j <= cg.ny; ++j)
 		{
@@ -580,7 +580,7 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems, long bgn, long l
 {
 	voxelField<int> voxls = VElems;
 	long long nChanges(0);
-	OMPragma("omp parallel for reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
+	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nChanges)") for (short k = 1; k <= cg.nz; ++k)
 	{
 		for (short j = 1; j <= cg.ny; ++j)
 		{
