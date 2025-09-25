@@ -234,7 +234,7 @@ void medialSurface::paradoxremoveincludedballI()
 	// sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
 	// 	 { return a->R > b->R; });
 	boost::sort::sample_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-							 { return a->R > b->R; }, omp_get_num_threads());
+							 { return a->R > b->R; }, num_workers);
 
 	cout << " remove included balls:";
 	cout.flush();
@@ -1092,7 +1092,7 @@ void medialSurface::createBallsAndHierarchy()
 		// sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
 		// 	 { return a->R > b->R; });
 		boost::sort::sample_sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-								 { return a->R > b->R; }, omp_get_num_threads());
+								 { return a->R > b->R; }, num_workers);
 		cout << " sorting " << int(tvs.size()) << " maximal balls" << endl;
 	}
 

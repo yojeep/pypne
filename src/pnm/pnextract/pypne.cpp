@@ -45,10 +45,10 @@ py::array_t<T> vector_to_numpy(const std::vector<T> &vec)
     );
 }
 
-auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsigned char> arr, py::dict config_dict,int n_workers)
-{   
-    
-    omp_set_num_threads(n_workers);
+auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsigned char> arr, py::dict config_dict, int n_workers)
+{
+    num_workers = n_workers;
+    omp_set_num_threads(num_workers);
     auto buf = arr.request();
     std::vector<unsigned char> data(arr.size());
     // auto arr_uncheck = arr.unchecked<1>();
@@ -56,9 +56,7 @@ auto genextraction(int nx, int ny, int nz, double resolution, py::array_t<unsign
     // {
     //     data[i] = arr_uncheck(i);
     // }
-
     std::memcpy(data.data(), buf.ptr, arr.size() * sizeof(unsigned char));
-
     voxelImageT_PYPNE<unsigned char> vm;
     vm.setData(data);
     vm.setNnn(int3(nx, ny, nz));
