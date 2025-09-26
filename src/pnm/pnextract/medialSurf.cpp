@@ -287,14 +287,14 @@ void medialSurface::paradoxremoveincludedballI()
 			float arg_ey = ripincsqr - asqr;
 			if (arg_ey < 0)
 				continue;
-			ey = std::sqrt(arg_ey);
+			ey = std::sqrtf(arg_ey);
 			for (int b = -ey; b <= ey; ++b)
 			{
 				const float bsqr = b * b;
 				float arg_ez = ripincsqr - asqr - bsqr;
 				if (arg_ez < 0)
 					continue;
-				ez = sqrt(arg_ez); // sqrts(r2i)+1-a-b;
+				ez = std::sqrtf(arg_ez); // sqrts(r2i)+1-a-b;
 				for (int c = -ez; c <= ez; ++c)
 				{
 					voxel *vj = vxl(x + a, y + b, z + c);
@@ -303,7 +303,7 @@ void medialSurface::paradoxremoveincludedballI()
 						const float rj = vj->R;
 						if (rj <= ri)
 						{
-							const float D = sqrtf(asqr + bsqr + c * c);
+							const float D = std::sqrtf(asqr + bsqr + c * c);
 							if (D < mbmbDist || (D + rj < ripinc + _MSNoise))
 							{
 								vj->ball = nullptr;
@@ -636,24 +636,27 @@ void medialSurface::findBoss(medialBall *vi)
 	const float x = vi->fi, y = vi->fj, z = vi->fk;
 	const float ripp = vi->R * 0.6 + 2. * _MSNoise + 2.;
 	const float ex = x + ripp;
-	for (float xpa = 2. * x - ex; xpa <= ex; xpa += 1.0f)
+	const float ripp2 = ripp * ripp;
+	for (float xpa = 2.f * x - ex; xpa <= ex; xpa += 1.0f)
 	{
-		float remain_y = ripp * ripp - (xpa - x) * (xpa - x);
+		float xpa2 = (xpa - x) * (xpa - x);
+		const float remain_y = ripp2 - xpa2;
 		if (remain_y <= 0.f)
 			continue;
-		float ey = y + sqrt(remain_y);
-		for (float ypb = 2. * y - ey; ypb <= ey; ypb += 1.0f)
+		float ey = y + sqrtf(remain_y);
+		for (float ypb = 2.f * y - ey; ypb <= ey; ypb += 1.0f)
 		{
-			float remain_z = remain_y - (y - ypb) * (y - ypb);
+			float ypb2 = (ypb - y) * (ypb - y);
+			float remain_z = remain_y - ypb2;
 			if (remain_z <= 0.f)
 				continue;
-			float ez = z + sqrt(remain_z);
-			for (float zpc = 2. * z - ez; zpc <= ez; zpc += 1.0f)
+			float ez = z + sqrtf(remain_z);
+			for (float zpc = 2.f * z - ez; zpc <= ez; zpc += 1.0f)
 			{
 				voxel *vj = this->vxl(xpa, ypb, zpc);
-				if ((vj != nullptr) && vj->ball && (*vi != *vj))
+				if ((vj != nullptr) && vj->ball && (vi != vj->ball))
 				{ //--------------------------------------------------------
-					competeForParent(&*vi, vj->ball);
+					competeForParent(vi, vj->ball);
 				} //--------------------------------------------------------
 			}
 		}
