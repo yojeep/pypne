@@ -10,13 +10,6 @@
 #include <atomic>
 // #include "medialRadius.cpp"
 
-void medialSurface::build_kdtree()
-{
-	using my_kd_tree_t = nanoflann::KDTreeSingleIndexDynamicAdaptor<
-		nanoflann::L2_Simple_Adaptor<int, PointCloud<int>>,
-		PointCloud<int>, 3, size_t>;
-}
-
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
 	: cg_(cfg), segs_(cfg.segs_), ToBeAssigned(0)
 {
@@ -285,18 +278,20 @@ void medialSurface::paradoxremoveincludedballI()
 		const float ri = vi->R;
 		const float ripinc = ri + 0.55; //.+RPreDelete
 		const float mbmbDist = _RCorsnf * ri + _RCorsn;
-
+		const float ripincsqr = ripinc * ripinc;
 		int ex, ey, ez;
 		ex = ripinc;
 		for (int a = -ex; a <= ex; ++a)
 		{
-			float arg_ey = ripinc * ripinc - a * a;
+			const float asqr = a * a;
+			float arg_ey = ripincsqr - asqr;
 			if (arg_ey < 0)
 				continue;
 			ey = std::sqrt(arg_ey);
 			for (int b = -ey; b <= ey; ++b)
 			{
-				float arg_ez = ripinc * ripinc - a * a - b * b;
+				const float bsqr = b * b;
+				float arg_ez = ripincsqr - asqr - bsqr;
 				if (arg_ez < 0)
 					continue;
 				ez = sqrt(arg_ez); // sqrts(r2i)+1-a-b;
@@ -308,8 +303,7 @@ void medialSurface::paradoxremoveincludedballI()
 						const float rj = vj->R;
 						if (rj <= ri)
 						{
-							float D = sqrtf(a * a + b * b + c * c);
-
+							const float D = sqrtf(asqr + bsqr + c * c);
 							if (D < mbmbDist || (D + rj < ripinc + _MSNoise))
 							{
 								vj->ball = nullptr;

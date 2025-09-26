@@ -5,7 +5,7 @@ set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
 project(pypne_project LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++17，否则报错
+set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++20，否则报错
 
 
 # add_subdirectory(src/pnm/pnextract)
@@ -24,12 +24,11 @@ ${CMAKE_SOURCE_DIR}/src/include
 ${CMAKE_SOURCE_DIR}/src/libvoxel
 ${CMAKE_SOURCE_DIR}/thirdparty/pybind11-3.0.1/include
 ${CMAKE_SOURCE_DIR}/thirdparty)
-
+target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pypne_cpp PRIVATE -Ofast -Wall)
-    target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 endif()
 
 install(TARGETS pypne_cpp LIBRARY DESTINATION pypne/libcpp)

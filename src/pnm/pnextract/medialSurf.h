@@ -9,33 +9,6 @@
 #include "typses.h"
 #include "inputData.h"
 
-template <typename T>
-struct PointCloud
-{
-	using coord_t = T; //!< The type of each coordinate
-	std::vector<voxel *> pts;
-	// Must return the number of data points
-	inline size_t kdtree_get_point_count() const { return pts.size(); }
-	// Returns the dim'th component of the idx'th point in the class:
-	// Since this is inlined and the "dim" argument is typically an immediate
-	// value, the
-	//  "if/else's" are actually solved at compile time.
-	inline T kdtree_get_pt(const size_t idx, const size_t dim) const
-	{
-		if (dim == 0)
-			return pts[idx]->i;
-		else if (dim == 1)
-			return pts[idx]->j;
-		else
-			return pts[idx]->k;
-	}
-	template <class BBOX>
-	bool kdtree_get_bbox(BBOX & /* bb */) const
-	{
-		return false;
-	}
-};
-
 class medialSurface
 {
 public:
@@ -61,11 +34,9 @@ public:
 	void paradoxremoveincludedballI();
 
 	void calc_distmaps();
-	std::vector<std::vector<size_t>> iZ;
-	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const;
 
+	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const;
 	void buildvoxelspace();
-	void build_kdtree();
 	void smoothRadius();
 
 	void competeForParentNoMerge(medialBall *vi, medialBall *vjv);
@@ -144,6 +115,7 @@ public:
 	std::vector<voxel> vxlSpace;
 	std::vector<medialBall> ballSpace;
 	medialBall ToBeAssigned;
+	std::vector<std::vector<size_t>> iZ;
 
 	float _minRp;
 	double _clipROutx;
