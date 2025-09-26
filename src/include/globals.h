@@ -7,7 +7,41 @@
 #include <memory>
 #include <map>
 #include <filesystem> // Include the standard filesystem header
+#include <thread_pool/BS_thread_pool.hpp>
+#include <memory>
 inline int num_workers(1);
+#pragma once
+class GlobalThreadPool
+{
+private:
+    // 使用 inline 让静态变量可在头文件中定义
+    inline static std::unique_ptr<BS::thread_pool<>> instance = nullptr;
+    inline static std::once_flag init_flag;
+
+public:
+    static BS::thread_pool<> &get()
+    {
+        // 线程安全的懒加载
+        if (!instance)
+        {
+            instance = std::make_unique<BS::thread_pool<>>(num_workers);
+        }
+        return *instance;
+    }
+
+    static void shutdown()
+    {
+        if (instance)
+        {
+            instance.reset(); // 释放资源
+        }
+    }
+
+    // 禁止实例化
+    GlobalThreadPool() = delete;
+    GlobalThreadPool(const GlobalThreadPool &) = delete;
+    GlobalThreadPool &operator=(const GlobalThreadPool &) = delete;
+};
 namespace fs = std::filesystem; // Create an alias for convenience
 
 inline std::string getpwd() { return fs::current_path().string(); }

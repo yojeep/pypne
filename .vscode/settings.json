@@ -123,6 +123,8 @@
         "mdspan": "cpp",
         "execution": "cpp",
         "*.inc": "cpp",
-        "climits": "cpp"
+        "climits": "cpp",
+        "ciso646": "cpp",
+        "version": "cpp"
     }
 }

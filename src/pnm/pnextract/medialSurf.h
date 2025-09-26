@@ -9,6 +9,33 @@
 #include "typses.h"
 #include "inputData.h"
 
+template <typename T>
+struct PointCloud
+{
+	using coord_t = T; //!< The type of each coordinate
+	std::vector<voxel *> pts;
+	// Must return the number of data points
+	inline size_t kdtree_get_point_count() const { return pts.size(); }
+	// Returns the dim'th component of the idx'th point in the class:
+	// Since this is inlined and the "dim" argument is typically an immediate
+	// value, the
+	//  "if/else's" are actually solved at compile time.
+	inline T kdtree_get_pt(const size_t idx, const size_t dim) const
+	{
+		if (dim == 0)
+			return pts[idx]->i;
+		else if (dim == 1)
+			return pts[idx]->j;
+		else
+			return pts[idx]->k;
+	}
+	template <class BBOX>
+	bool kdtree_get_bbox(BBOX & /* bb */) const
+	{
+		return false;
+	}
+};
+
 class medialSurface
 {
 public:
@@ -38,7 +65,7 @@ public:
 	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const;
 
 	void buildvoxelspace();
-
+	void build_kdtree();
 	void smoothRadius();
 
 	void competeForParentNoMerge(medialBall *vi, medialBall *vjv);
@@ -54,7 +81,7 @@ public:
 		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
 			return nullptr;
 
-		segments &s = segs_[k][j];
+		segments &s = segs_[k * ny + j];
 		int p = s.fsi(i);
 		if (p != -1)
 		{
@@ -68,7 +95,7 @@ public:
 		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
 			return invalidSeg;
 
-		const segments &s = segs_[k][j];
+		const segments &s = segs_[k * ny + j];
 		int p = s.fsi(i);
 		if (p != -1)
 			return (s.s[p]);
@@ -81,7 +108,7 @@ public:
 		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
 			return invalidSeg;
 
-		const segments &s = segs_[k][j];
+		const segments &s = segs_[k * ny + j];
 		int p = s.fsi(i);
 		if (p != -1)
 			return (s.s[p + 1]);
@@ -112,7 +139,7 @@ public:
 	size_t nVxls;
 	size_t nBalls;
 
-	boost::multi_array<segments, 2> &segs_;
+	std::vector<segments> &segs_;
 	segment invalidSeg;
 	std::vector<voxel> vxlSpace;
 	std::vector<medialBall> ballSpace;
@@ -132,4 +159,4 @@ public:
 	float _RCorsn;
 };
 
-#endif
+#endif // REFERENCE_H

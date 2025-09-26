@@ -73,7 +73,7 @@ public:
 // void growPores_XX(voxelField<int>&  VElems, int min, int max, int porValue);
 // void shrinkPores(voxelField<int>&  VElems, int min, int max, int porValue);
 
-unsigned int growPores_X2(voxelField<int> &VElems, int min, int max, int porValue);
+size_t growPores_X2(voxelField<int> &VElems, int min, int max, int porValue);
 
 void growPores(voxelField<int> &VElems, int min, int max, int porValue);
 

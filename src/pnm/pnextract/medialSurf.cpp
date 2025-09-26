@@ -5,7 +5,17 @@
 #include <atomic>
 #include <boost/multi_array.hpp>
 #include <boost/sort/sort.hpp>
+#include <nanoflann/nanoflann.hpp>
+#include <mutex>
+#include <atomic>
 // #include "medialRadius.cpp"
+
+void medialSurface::build_kdtree()
+{
+	using my_kd_tree_t = nanoflann::KDTreeSingleIndexDynamicAdaptor<
+		nanoflann::L2_Simple_Adaptor<int, PointCloud<int>>,
+		PointCloud<int>, 3, size_t>;
+}
 
 medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
 	: cg_(cfg), segs_(cfg.segs_), ToBeAssigned(0)
@@ -15,16 +25,27 @@ medialSurface::medialSurface(inputDataNE &cfg) //, double vmvLimRelF, double cro
 	nx = cfg.nx;
 	ny = cfg.ny;
 	nz = cfg.nz;
-
-	size_t nvoxls = 0; // local copy for omp
-	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:nvoxls)") for (int k = 0; k < nz; ++k) for (int j = 0; j < ny; ++j)
+	auto &pool = GlobalThreadPool::get();
+	const int total_iterations = nz * ny;
+	auto nVxls_future = pool.submit_blocks(
+		0, total_iterations,
+		[&](const size_t start, const size_t end) -> int
+		{
+			size_t local_nVxls = 0;
+			for (size_t i = start; i < end; ++i)
+			{
+				const segments &s = cg_.segs_[i];
+				for (int ix = 0; ix < s.cnt; ++ix)
+					if (s.s[ix].value == 0)
+						local_nVxls += s.s[ix + 1].start - s.s[ix].start;
+			}
+			return local_nVxls;
+		});
+	nVxls = 0;
+	for (std::future<int> &future : nVxls_future)
 	{
-		const segments &s = cg_.segs_[k][j];
-		for (int ix = 0; ix < s.cnt; ++ix)
-			if (s.s[ix].value == 0)
-				nvoxls += s.s[ix + 1].start - s.s[ix].start;
+		nVxls += future.get();
 	}
-	nVxls = nvoxls;
 	invalidSeg.start = -10000;
 	invalidSeg.value = 255;
 }
@@ -95,7 +116,7 @@ void medialSurface::buildvoxelspace()
 	{
 		for (int iy = 0; iy < ny; ++iy)
 		{
-			const segments &s = segs_[iz][iy];
+			const segments &s = segs_[iz * ny + iy];
 			for (int ix = 0; ix < s.cnt; ++ix)
 			{
 				if (s.s[ix].value == 0)
@@ -119,17 +140,17 @@ void medialSurface::buildvoxelspace()
 
 	/// Link voxels to segments
 	p = vxlSpace.begin();
-	for (int iz = 0; iz < nz; ++iz)
-		for (int iy = 0; iy < ny; ++iy)
-		{
-			segments &s = segs_[iz][iy];
-			for (int ix = 0; ix < s.cnt; ++ix)
-				if (s.s[ix].value == 0)
-				{
-					s.s[ix].segV = &*p;
-					p += s.s[ix + 1].start - s.s[ix].start;
-				}
-		}
+	int total_iterations = nz * ny;
+	for (int izy = 0; izy < total_iterations; ++izy)
+	{
+		segments &s = segs_[izy];
+		for (int ix = 0; ix < s.cnt; ++ix)
+			if (s.s[ix].value == 0)
+			{
+				s.s[ix].segV = &*p;
+				p += s.s[ix + 1].start - s.s[ix].start;
+			}
+	}
 }
 
 void medialSurface::paradox_pre_removeincludedballI() // to remove the included maximal bals
@@ -140,64 +161,64 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included 
 	}
 	cout << " pre-remove included balls: out of " << vxlSpace.size();
 	cout.flush();
-	size_t ndel = 0;
-	OMPragma("omp parallel for collapse(2) schedule(static) reduction(+:ndel)") for (int kk = 0; kk < nz; kk += 2)
-	{
-		for (int jj = 0; jj < ny; jj += 2)
+
+	auto &pool = GlobalThreadPool::get();
+	const int jj_steps = (ny + 1) / 2;
+	const int kk_steps = (nz + 1) / 2;
+	const int total_iterations = kk_steps * jj_steps;
+	auto ndel_future = pool.submit_blocks(
+		0, total_iterations,
+		[&](const size_t start, const size_t end) -> int
 		{
-			const segments &s = segs_[kk][jj];
-			for (int ix = 0; ix < s.cnt; ++ix)
+			int local_ndel = 0; // 每个 block 自己的计数器
+			for (size_t iter = start; iter < end; ++iter)
 			{
-				if (s.s[ix].value == 0)
+				int kk_idx = iter / jj_steps;
+				int jj_idx = iter % jj_steps;
+				int kk = kk_idx * 2;
+				int jj = jj_idx * 2;
+				const segments &s = segs_[kk * ny + jj];
+				for (int ix = 0; ix < s.cnt; ++ix)
 				{
-					int ii_start = s.s[ix].start;
-					int ii_end = s.s[ix + 1].start;
-					for (int ii = ii_start; ii < ii_end; ii += 2)
+					if (s.s[ix].value == 0)
 					{
-						voxel *adjacent[8] = {
-							vxl(ii, jj, kk),
-							vxl(ii + 1, jj, kk),
-							vxl(ii, jj + 1, kk),
-							vxl(ii + 1, jj + 1, kk),
-							vxl(ii, jj, kk + 1),
-							vxl(ii + 1, jj, kk + 1),
-							vxl(ii, jj + 1, kk + 1),
-							vxl(ii + 1, jj + 1, kk + 1)};
-
-						voxel *max_voxel = nullptr;
-						float max_R = 0.0f; // 保存当前最大R值
-						// 查找最大R的体素
-						for (int c = 0; c < 8; ++c)
+						int ii_start = s.s[ix].start;
+						int ii_end = s.s[ix + 1].start;
+						for (int ii = ii_start; ii < ii_end; ii += 2)
 						{
-							voxel *&adjacent_i = adjacent[c];
-							if (adjacent_i != nullptr)
-							{
-								if (adjacent_i->ball != nullptr)
-								{
-									float RRR = adjacent_i->R;
-									if (RRR > max_R)
-									{
-										max_voxel = adjacent_i;
-										max_R = RRR; // 同时更新max_R
-									}
-								}
-							}
-						}
+							voxel *adjacent[8] = {
+								vxl(ii, jj, kk),
+								vxl(ii + 1, jj, kk),
+								vxl(ii, jj + 1, kk),
+								vxl(ii + 1, jj + 1, kk),
+								vxl(ii, jj, kk + 1),
+								vxl(ii + 1, jj, kk + 1),
+								vxl(ii, jj + 1, kk + 1),
+								vxl(ii + 1, jj + 1, kk + 1)};
 
-						// 设置非最大体素的ball指针
-						if (max_voxel != nullptr)
-						{ // 确保至少有一个有效体素
+							// 查找 R 最大的体素
+							voxel *max_voxel = nullptr;
+							float max_R = 0.0f;
 							for (int c = 0; c < 8; ++c)
 							{
-								voxel *&adjacent_i = adjacent[c];
-								if (adjacent_i != nullptr)
+								voxel *adj = adjacent[c];
+								if (adj != nullptr && adj->ball != nullptr && adj->R > max_R)
 								{
-									medialBall *&adjacent_i_ball = adjacent_i->ball;
+									max_voxel = adj;
+									max_R = adj->R;
+								}
+							}
 
-									if (adjacent_i != max_voxel && adjacent_i_ball != nullptr)
+							// 清除非最大体素的 ball 指针
+							if (max_voxel != nullptr)
+							{
+								for (int c = 0; c < 8; ++c)
+								{
+									voxel *adj = adjacent[c];
+									if (adj != nullptr && adj->ball != nullptr && adj != max_voxel)
 									{
-										adjacent_i_ball = nullptr;
-										++ndel;
+										adj->ball = nullptr;
+										++local_ndel;
 									}
 								}
 							}
@@ -205,9 +226,17 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included 
 					}
 				}
 			}
-		}
+			return local_ndel; // 返回本 block 的结果
+		});
+
+	// 主线程合并所有结果
+	size_t ndel = 0;
+	for (std::future<int> &future : ndel_future)
+	{
+		ndel += future.get();
 	}
 	nBalls -= ndel;
+
 	cout << ",   removed = " << ndel << " remained = " << nBalls << endl;
 }
 
@@ -220,7 +249,7 @@ void medialSurface::paradoxremoveincludedballI()
 
 	cout << " sorting... ";
 	std::vector<voxel *> tvs;
-	tvs.reserve(nBalls); // 假设 nBalls 是合理的预估值
+	tvs.reserve(nBalls);
 	for (voxel &v : vxlSpace)
 	{
 		if (v.ball)
@@ -639,19 +668,34 @@ void medialSurface::findBoss(medialBall *vi)
 
 voxelImage segToVxlMesh(const medialSurface &ref)
 { /// converts segments back to voxelImage
-	voxelImage vxls(ref.nx, ref.ny, ref.nz, 255);
-	OMPragma("omp parallel for collapse(2) schedule(static)") for (int iz = 0; iz < ref.nz; ++iz)
-	{
-		for (int iy = 0; iy < ref.ny; ++iy)
-		{
-			const segments &s = ref.segs_[iz][iy];
-			for (int ix = 0; ix < s.cnt; ++ix)
-			{
-				std::fill(&vxls(s.s[ix].start, iy, iz), &vxls(s.s[ix + 1].start, iy, iz), s.s[ix].value);
-			}
-		}
-	}
-	return vxls;
+	int nx = ref.nx, ny = ref.ny, nz = ref.nz;
+	voxelImage vxls(nx, ny, nz, 255);
+	auto &pool = GlobalThreadPool::get();
+	const int total_iterations = ref.nz * ref.ny; // collapse(2)
+
+	// 使用 detach_blocks 并行执行
+	pool.detach_blocks(0, total_iterations,
+					   [&](const size_t start, const size_t end)
+					   {
+						   for (size_t iter = start; iter < end; ++iter)
+						   {
+							   // 手动 collapse(2): iz = iter / ref.ny, iy = iter % ref.ny
+							   int iz = iter / ny;
+							   int iy = iter % ny;
+							   const segments &s = ref.segs_[iz * ny + iy];
+							   for (int ix = 0; ix < s.cnt; ++ix)
+							   {
+								   // 填充值
+								   std::fill(&vxls(s.s[ix].start, iy, iz), &vxls(s.s[ix + 1].start, iy, iz), s.s[ix].value);
+							   }
+						   }
+					   });
+
+	// 等待所有任务完成
+	pool.wait();
+
+	// 返回已填充的数据（假设 vxls 是 std::vector<voxel>）
+	return vxls; // 或返回引用/指针，视具体类型而定
 }
 
 void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const
@@ -891,49 +935,68 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 	}
 
 	voxelImage vxls = segToVxlMesh(*this);
-	double rBalls = 0.;
 	const int k = -nz / 2 - 1;
-	std::vector<node> oldAliens;
-	oldAliens.reserve((ny + 1) * nx);
+	std::vector<node> oldAliens_base;
+	oldAliens_base.reserve((ny + 1) * nx);
 	for (int j = 0; j < ny + 1; ++j)
 		for (int i = 0; i < nx; ++i)
 		{
-			oldAliens.emplace_back(i, j, k);
+			oldAliens_base.emplace_back(i, j, k);
 		}
-	size_t print_interval = max(nz / 10, 1);
-	// 添加全局计数器用于准确跟踪进度
-	size_t progress_counter(0);
+	std::mutex mutex;
+	size_t print_interval = std::max(nz / 10, 1);
+	std::atomic<size_t> progress_counter(0);
 	size_t total_iz = nz;
-	// 使用iZ进行z方向并行处理
-	OMPragma("omp parallel for schedule(guided) reduction(+:rBalls,progress_counter) firstprivate(oldAliens)") for (int iz = 0; iz < nz; ++iz)
-	{
-		for (size_t idx : iZ[iz])
-		{
-			voxel &vit = vxlSpace[idx];
-			calc_distmap(vit, 0, vxls, oldAliens);
-			rBalls += vit.R;
-		}
+	auto &pool = GlobalThreadPool::get();
+	// 并行处理 iz in [0, nz)
+	auto rBalls_future = pool.submit_blocks(0, nz,
+											[&](const size_t start, const size_t end) -> double
+											{
+												// 每个线程私有数据
+												thread_local std::vector<node> oldAliens = oldAliens_base; // firstprivate 模拟
+												double local_rBalls = 0.0;								   // 局部累加，减少原子操作开销
 
-		// 原子操作更新进度计数器
-		++progress_counter;
-		// 控制进度输出频率并避免线程竞争
-		if (progress_counter % print_interval == 0 || progress_counter == total_iz)
-		{
-			OMPragma("omp critical")
-			{
-				// 使用浮点数计算百分比以提高精度
-				float percentage = (progress_counter * 100.0) / total_iz;
-				(cout << "\r distance map calculation progress = " << percentage << "%").flush();
-			}
-		}
+												for (size_t iz = start; iz < end; ++iz)
+												{
+													for (size_t idx : iZ[iz])
+													{
+														voxel &vit = vxlSpace[idx];
+														calc_distmap(vit, 0, vxls, oldAliens);
+														local_rBalls += vit.R;
+													}
+
+													// 更新全局进度计数器
+													size_t current_progress = ++progress_counter;
+
+													// 控制输出频率，避免过多 IO
+													if (current_progress % print_interval == 0 || current_progress == total_iz)
+													{
+														// 线程安全输出
+														std::lock_guard<std::mutex> lock(mutex); // 需要定义全局 mutex
+														float percentage = (current_progress * 100.0f) / total_iz;
+														std::cout << "\r distance map calculation progress = " << percentage << "%" << std::flush;
+													}
+												}
+
+												// 提交局部结果到原子变量
+												return local_rBalls;
+											});
+
+	// 等待所有任务完成
+	double rBalls(0.0);
+	for (std::future<double> &future : rBalls_future)
+	{
+		rBalls += future.get();
 	}
-	cout << "\n  average distance map = " << rBalls / nVxls << endl;
+	// 输出最终换行
+	std::cout << "\n";
+	// 获取最终 rBalls 值
+	std::cout << "  average distance map = " << rBalls / nVxls << std::endl;
 
 	if (_minRp < 0.)
 	{
 		setDefaults(rBalls / nVxls);
 	}
-
 	return;
 }
 
@@ -944,100 +1007,130 @@ void medialSurface::smoothRadius()
 
 	std::vector<float> delRrr(vxlSpace.size(), 0.0f);
 	(cout << "*").flush();
-	OMPragma("omp parallel for collapse(2) schedule(static)") for (int k = 0; k < nz; ++k)
-	{
-		for (int j = 0; j < ny; ++j)
-		{
-			const segments &s = cg_.segs_[k][j];
-			for (int ix = 0; ix < s.cnt; ++ix)
-				if (s.s[ix].value == 0)
-				{
-					segment &seg = s.s[ix];
-					for (int i = seg.start; i < s.s[ix + 1].start; ++i)
-					{
-						double sumR = 0.;
-						int counter = 0;
-						for (int kk = max(k - 1, 0); kk < min(k + 2, nz); ++kk)
-							for (int jj = max(j - 1, 0); jj < min(j + 2, ny); ++jj)
-							{
-								int ii = max(i - 1, 0);
-								const segment *segbc = cg_.segptr(ii, jj, kk);
-								if (segbc->value != 0 && (segbc + 1)->value == 0)
-								{
-									++segbc;
-									ii = segbc->start;
-								}
-								if (segbc->value == 0)
-								{
-									int ii2 = min((segbc + 1)->start, i + 2);
-									voxel *vxlj = segbc->segV + (ii - segbc->start);
-									for (; ii < ii2; ++ii)
-									{
-										sumR += vxlj->R;
-										++vxlj;
-										counter += 1;
-									}
-								}
-							}
 
-						delRrr[seg.segV + (i - seg.start) - (&vxlSpace[0])] = 4. * sumR / (3 * counter + 27) - seg.segV[i - seg.start].R;
-					}
-				}
-		}
-	}
+	auto &pool = GlobalThreadPool::get();
+	const size_t total_tasks = nz * ny;
+	pool.detach_blocks(0, total_tasks,
+					   [&](const size_t start, const size_t end)
+					   {
+						   for (size_t iter = start; iter < end; ++iter)
+						   {
+							   int k = iter / ny;
+							   int j = iter % ny;
+							   const segments &s = cg_.segs_[iter];
+							   for (int ix = 0; ix < s.cnt; ++ix)
+								   if (s.s[ix].value == 0)
+								   {
+									   segment &seg = s.s[ix];
+									   for (int i = seg.start; i < s.s[ix + 1].start; ++i)
+									   {
+										   double sumR = 0.;
+										   int counter = 0;
+										   for (int kk = max(k - 1, 0); kk < min(k + 2, nz); ++kk)
+											   for (int jj = max(j - 1, 0); jj < min(j + 2, ny); ++jj)
+											   {
+												   int ii = max(i - 1, 0);
+												   const segment *segbc = cg_.segptr(ii, jj, kk);
+												   if (segbc->value != 0 && (segbc + 1)->value == 0)
+												   {
+													   ++segbc;
+													   ii = segbc->start;
+												   }
+												   if (segbc->value == 0)
+												   {
+													   int ii2 = min((segbc + 1)->start, i + 2);
+													   voxel *vxlj = segbc->segV + (ii - segbc->start);
+													   for (; ii < ii2; ++ii)
+													   {
+														   sumR += vxlj->R;
+														   ++vxlj;
+														   counter += 1;
+													   }
+												   }
+											   }
+
+										   delRrr[seg.segV + (i - seg.start) - (&vxlSpace[0])] = 4. * sumR / (3 * counter + 27) - seg.segV[i - seg.start].R;
+									   }
+								   }
+						   }
+					   });
+	pool.wait();
 	(cout << "*").flush();
 
-	OMPragma("omp parallel for collapse(2) schedule(static)") for (int k = 0; k < nz; ++k)
-	{
-		for (int j = 0; j < ny; ++j)
-		{
-			const segments &s = cg_.segs_[k][j];
-			for (int ix = 0; ix < s.cnt; ++ix)
-				if (s.s[ix].value == 0)
-				{
-					segment &seg = s.s[ix];
-					for (int i = seg.start; i < s.s[ix + 1].start; ++i)
-					{
-						double sumDelR = 0.;
-						int counter = 0;
-						for (int kk = max(k - 1, 0); kk < min(k + 2, nz); ++kk)
-							for (int jj = max(j - 1, 0); jj < min(j + 2, ny); ++jj)
-							{
-								int ii = max(i - 1, 0);
-								const segment *segbc = cg_.segptr(ii, jj, kk);
-								if (segbc->value != 0 && (segbc + 1)->value == 0)
-								{
-									++segbc;
-									ii = segbc->start;
-								}
-								if (segbc->value == 0)
-								{
-									int ii2 = min((segbc + 1)->start, i + 2);
-									voxel *vxlj = segbc->segV + (ii - segbc->start);
-									for (; ii < ii2; ++ii)
-									{
-										sumDelR += delRrr[vxlj - (&vxlSpace[0])];
-										++vxlj;
-										++counter;
-									}
-								}
-							}
+	pool.detach_blocks(0, total_tasks,
+					   [&](const size_t start, const size_t end)
+					   {
+						   for (size_t iter = start; iter < end; ++iter)
+						   {
+							   int k = iter / ny;
+							   int j = iter % ny;
+							   const segments &s = cg_.segs_[iter];
+							   for (int ix = 0; ix < s.cnt; ++ix)
+								   if (s.s[ix].value == 0)
+								   {
+									   segment &seg = s.s[ix];
+									   for (int i = seg.start; i < s.s[ix + 1].start; ++i)
+									   {
+										   double sumDelR = 0.;
+										   int counter = 0;
+										   for (int kk = max(k - 1, 0); kk < min(k + 2, nz); ++kk)
+											   for (int jj = max(j - 1, 0); jj < min(j + 2, ny); ++jj)
+											   {
+												   int ii = max(i - 1, 0);
+												   const segment *segbc = cg_.segptr(ii, jj, kk);
+												   if (segbc->value != 0 && (segbc + 1)->value == 0)
+												   {
+													   ++segbc;
+													   ii = segbc->start;
+												   }
+												   if (segbc->value == 0)
+												   {
+													   int ii2 = min((segbc + 1)->start, i + 2);
+													   voxel *vxlj = segbc->segV + (ii - segbc->start);
+													   for (; ii < ii2; ++ii)
+													   {
+														   sumDelR += delRrr[vxlj - (&vxlSpace[0])];
+														   ++vxlj;
+														   ++counter;
+													   }
+												   }
+											   }
 
-						seg.segV[i - seg.start].R += min(max(0.02 * (delRrr[seg.segV + (i - seg.start) - (&vxlSpace[0])] - 0.99 * 2. * sumDelR / (1 * counter + 27)), -0.005), 0.01);
-					}
-				}
-		}
-	}
+										   seg.segV[i - seg.start].R += min(max(0.02 * (delRrr[seg.segV + (i - seg.start) - (&vxlSpace[0])] - 0.99 * 2. * sumDelR / (1 * counter + 27)), -0.005), 0.01);
+									   }
+								   }
+						   }
+					   });
+	pool.wait();
 	(cout << "*").flush();
 
-	{ /// Finally, report max distance map, to confirm that distance map is not changed too much
-		float maxrrr = 0;
-		OMPragma("omp parallel for schedule(static) reduction(max:maxrrr)") for (const voxel &v : vxlSpace)
-		{
-			maxrrr = max(maxrrr, v.R);
-		}
-		cout << " maxrrr " << maxrrr << endl;
+	/// Finally, report max distance map, to confirm that distance map is not changed too much
+	float maxrrr = 0.0f;
+	const size_t total = vxlSpace.size();
+	if (total == 0)
+	{
+		cout << " maxrrr 0." << endl;
+		return; // 或继续
 	}
+
+	// 提交任务：每个任务返回该块内的最大 R 值
+	auto maxrrr_future = pool.submit_blocks(
+		0, total,
+		[&](const size_t start, const size_t end) -> float
+		{
+			float local_max = 0.0f;
+			for (size_t i = start; i < end; ++i)
+			{
+				local_max = std::max(local_max, vxlSpace[i].R);
+			}
+			return local_max;
+		});
+	// 等待所有任务完成，并合并结果
+	for (auto &future : maxrrr_future)
+	{
+		maxrrr = std::max(maxrrr, future.get());
+	}
+	cout << " maxrrr " << maxrrr << endl;
 }
 
 void medialSurface::createBallsAndHierarchy()
@@ -1051,23 +1144,41 @@ void medialSurface::createBallsAndHierarchy()
 
 	for (int i = 0; i < _nRSmoothing; ++i)
 		smoothRadius();
-
 	nBalls = 0;
-	double rBalls = 0.;
-	size_t vxlSpace_size = vxlSpace.size();
-	OMPragma("omp parallel for schedule(static) reduction(+:nBalls,rBalls)") for (size_t i = 0; i < vxlSpace_size; ++i)
+	double rBalls = 0.0f;
+	auto &pool = GlobalThreadPool::get();
+	const size_t total_iterations = vxlSpace.size();
+	// 提交任务块，每个返回 (nBalls_local, rBalls_local)
+	auto nBalls_rBalls_futures = pool.submit_blocks(
+		0, total_iterations,
+		[&](const size_t start, const size_t end) -> std::pair<size_t, double>
+		{
+			size_t local_nBalls = 0;
+			double local_rBalls = 0.0;
+
+			for (size_t i = start; i < end; ++i)
+			{
+				voxel &v = vxlSpace[i];
+				if (v.R >= _minRp)
+				{
+					v.ball = &ToBeAssigned;
+					++local_nBalls;
+					local_rBalls += v.R;
+				}
+				else
+				{
+					v.ball = nullptr;
+				}
+			}
+
+			return std::make_pair(local_nBalls, local_rBalls);
+		});
+
+	for (auto &future : nBalls_rBalls_futures)
 	{
-		voxel &v = vxlSpace[i];
-		if (v.R >= _minRp)
-		{
-			v.ball = &ToBeAssigned;
-			++nBalls;
-			rBalls += v.R;
-		}
-		else
-		{
-			v.ball = nullptr;
-		}
+		auto [local_nBalls, local_rBalls] = future.get();
+		nBalls += local_nBalls;
+		rBalls += local_rBalls;
 	}
 	cout << "\n  number of potential maximal spheres: " << nBalls << ",  average radius = " << rBalls / nBalls << endl;
 
@@ -1101,22 +1212,32 @@ void medialSurface::createBallsAndHierarchy()
 		v->ball = &ballSpace.back();
 	}
 
-	// const std::vector<medialBall>::iterator voxend = ballSpace.end();
+	pool.detach_blocks(0, nBalls,
+					   [&](const size_t start, const size_t end)
+					   {
+						   for (size_t i = start; i < end; ++i)
+						   {
+							   moveUphill(&ballSpace[i]);
+						   }
+					   });
 
-	OMPragma("omp parallel for schedule(static)") for (size_t i = 0; i < nBalls; ++i)
-	{
-		moveUphill(&ballSpace[i]);
-	}
+	pool.wait();
 
 	for (size_t i = 0; i < nBalls; ++i)
 	{
 		moveUphillp1(&ballSpace[i]);
 	}
 
-	OMPragma("omp parallel for schedule(static)") for (size_t i = 0; i < nBalls; ++i)
-	{
-		moveUphill(&ballSpace[i]);
-	}
+	pool.detach_blocks(0, nBalls,
+					   [&](const size_t start, const size_t end)
+					   {
+						   for (size_t i = start; i < end; ++i)
+						   {
+							   moveUphill(&ballSpace[i]);
+						   }
+					   });
+
+	pool.wait();
 
 	cout << " creating ball hierarchy:";
 	cout.flush();

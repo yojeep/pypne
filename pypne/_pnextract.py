@@ -49,7 +49,7 @@ def str2bool(value, raise_exc=False):
     return None
 
 
-def pnextract(image, resolution=1.0, config_settings=None, verbose=False,n_workers=1):
+def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_workers=1):
     """
     image : 3D numpy array of binary image data,0 is the value to be extracted
     resolution : resolution of the image, default is 1.0
@@ -153,6 +153,7 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False,n_worke
     image = image.astype(np.uint8)
     nz, ny, nx = image.shape
     # 直接根据 verbose 决定是否使用 suppress_stdout
+    n_workers = os.cpu_count() if n_workers <= 0 else min(n_workers, os.cpu_count())
     with suppress_stdout() if not verbose else nullcontext():
         res = pypne_cpp.pnextract(
             nx, ny, nz, resolution, image.reshape(-1), default_config.copy(), n_workers

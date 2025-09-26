@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.18)
 # set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
 project(pypne_project LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++17，否则报错
 
@@ -29,19 +29,7 @@ if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pypne_cpp PRIVATE -Ofast -Wall)
+    target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 endif()
 
-
-###### OpenMP Parallelization ######
-option(USE_OMP "Enable OpenMP parallelization" ON)
-if(USE_OMP)
-    find_package(OpenMP REQUIRED)
-    if(MSVC)# Do not use!!!
-        # MSVC 编译器不支持 OpenMP4.0
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-        # GCC/Clang 使用 -fopenmp
-        target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS OpenMP)
-        target_link_libraries(pypne_cpp PRIVATE OpenMP::OpenMP_CXX)
-    endif()
-endif()
 install(TARGETS pypne_cpp LIBRARY DESTINATION pypne/libcpp)

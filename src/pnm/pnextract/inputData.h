@@ -197,55 +197,82 @@ public:
 
 	void createSegments()
 	{
+		size_t num_rockTypesp1 = _rockTypes.size() + 1;
 
-		stvec<size_t> nVxlVs(_rockTypes.size() + 1, 0);
-		segs_.resize(boost::extents[nz][ny]);
-		// segs_.resize(nz, stvec<segments>(ny));
+		stvec<size_t> nVxlVs(num_rockTypesp1, 0);
+		segs_.resize(nz * ny);
+		// 全局结果向量
+		// std::vector<size_t> nVxlVs(256, 0);
+		std::mutex mutex;
+		auto &pool = GlobalThreadPool::get();
+		const size_t total_z = nz;
 
-#ifdef OpenMP
-#pragma omp declare reduction(vec_sizet_plus : std::vector<size_t> : std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<size_t>())) \
-	initializer(omp_priv = omp_orig)
-#endif
-
-		OMPragma("omp parallel for schedule(static) reduction(vec_sizet_plus:nVxlVs)") for (int iz = 0; iz < nz; ++iz)
-		{
-			stvec<segment> segTmp(nx + 1);
-			for (int iy = 0; iy < ny; ++iy)
+		// 提交任务：每个任务处理一个 iz 范围块，返回局部计数器
+		auto nVxlVs_future = pool.submit_blocks(
+			0, total_z,
+			[&](const size_t start, const size_t end) -> std::vector<size_t>
 			{
-				int cnt = 0;
-				int currentSegValue = 257;
-				for (int ix = 0; ix < nx; ++ix)
+				std::vector<size_t> nVxlVs_local(num_rockTypesp1, 0);
+				thread_local stvec<segment> segTmp(nx + 1);
+				for (size_t iz = start; iz < end; ++iz)
 				{
-					unsigned char vV = VImage(ix, iy, iz);
-					if (segValues[vV] != currentSegValue)
+					for (int iy = 0; iy < ny; ++iy)
 					{
-						currentSegValue = segValues[vV];
-						segTmp[cnt].start = ix;
-						segTmp[cnt].value = currentSegValue;
-						++cnt;
+						int cnt = 0;
+						int currentSegValue = 257;
+						for (int ix = 0; ix < nx; ++ix)
+						{
+							unsigned char vV = VImage(ix, iy, iz);
+							int segVal = segValues[vV];
+							if (segVal != currentSegValue)
+							{
+								currentSegValue = segVal;
+								segTmp[cnt].start = ix;
+								segTmp[cnt].value = segVal;
+								++cnt;
+							}
+							++nVxlVs_local[segVal]; // 累加到局部数组
+						}
+						// 安全写入 segs_：每个 (iz, iy) 仅被当前线程访问
+						segments &ss = segs_[iz * ny + iy];
+						ss.cnt = cnt;
+						ss.cntp1 = cnt + 1;
+						ss.reSize(ss.cntp1);
+						if (ss.s == nullptr)
+						{
+							std::lock_guard<std::mutex> lock(mutex);
+							cout << "\n   iz " << iz << " iy " << iy << " cnt" << cnt << " ERROR XX XX" << endl;
+						}
+
+						// 复制 segTmp 到 ss.s
+						for (int i = 0; i < cnt; ++i)
+						{
+							ss.s[i].start = segTmp[i].start;
+							ss.s[i].value = segTmp[i].value;
+							if (i > 0 && ss.s[i].value == ss.s[i - 1].value)
+							{
+								std::lock_guard<std::mutex> lock(mutex);
+								cout << "\n   ERROR XXX" << i << " "
+									 << int(ss.s[i - 1].value) << " " << int(ss.s[i].value) << "    "
+									 << int(segValues[3]) << "    "
+									 << int(VImage(ss.s[i - 1].start, iy, iz)) << " "
+									 << int(VImage(ss.s[i].start, iy, iz)) << endl;
+							}
+						}
+						ss.s[cnt].start = nx;
+						ss.s[cnt].value = 254;
+						ss.initial_starts();
 					}
-					++(nVxlVs[segValues[vV]]);
 				}
 
-				segments &ss = segs_[iz][iy];
-				ss.cnt = cnt;
-				ss.cntp1 = cnt + 1;
-				ss.reSize(ss.cntp1);
-				if (segs_[iz][iy].s == nullptr)
-				{
-					cout << "\n   iz " << iz << " iy " << iy << " cnt" << cnt << " ERROR XX XX" << endl;
-				}
-
-				for (int i = 0; i < cnt; ++i)
-				{
-					ss.s[i].start = segTmp[i].start;
-					ss.s[i].value = segTmp[i].value;
-					if (i > 0 && ss.s[i].value == ss.s[i - 1].value)
-						cout << "\n   ERROR XXX" << i << " " << int(ss.s[i - 1].value) << " " << int(ss.s[i].value) << "    " << int(segValues[3]) << "    " << int(VImage(ss.s[i - 1].start, iy, iz)) << " " << int(VImage(ss.s[i].start, iy, iz)) << endl;
-				}
-				ss.s[cnt].start = nx;
-				ss.s[cnt].value = 254;
-				ss.initial_starts();
+				return nVxlVs_local;
+			});
+		for (auto &future : nVxlVs_future)
+		{
+			auto local_counts = future.get();
+			for (size_t i = 0; i < num_rockTypesp1; ++i)
+			{
+				nVxlVs[i] += local_counts[i];
 			}
 		}
 
@@ -266,7 +293,7 @@ public:
 		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
 			return &invalidSeg;
 
-		const segments &s = segs_[k][j];
+		const segments &s = segs_[k * ny + j];
 		int p = s.fsi(i);
 		if (p != -1)
 			return s.s + p;
@@ -286,7 +313,7 @@ public:
 	long long nInside;
 
 	std::string flowBaseDir;
-	boost::multi_array<segments, 2> segs_;
+	std::vector<segments> segs_;
 
 	segment invalidSeg;
 

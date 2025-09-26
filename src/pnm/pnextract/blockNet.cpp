@@ -76,7 +76,7 @@ void blockNetwork::CreateVElem(size_t startValue)
 	{
 		for (int iy = 0; iy < cg.ny; ++iy)
 		{
-			const segments &s = cg.segs_[iz][iy];
+			const segments &s = cg.segs_[iz * cg.ny + iy];
 			for (int ix = 0; ix < s.cnt; ++ix)
 			{
 				int value = -1 - int(s.s[ix].value);
