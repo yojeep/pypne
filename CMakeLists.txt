@@ -1,14 +1,14 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.28)
 # set(CMAKE_C_COMPILER clang)
 # set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
 project(pypne_project LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须使用 C++20，否则报错
 
-
 # add_subdirectory(src/pnm/pnextract)
+set(pybind11_DIR ${CMAKE_SOURCE_DIR}/thirdparty/pybind11/share/cmake/pybind11)
 find_package(pybind11 REQUIRED)
 pybind11_add_module(pypne_cpp
 ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/blockNet.cpp
