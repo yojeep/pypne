@@ -315,9 +315,8 @@ void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, long bgn
 			for (size_t idx = start_idx; idx < end_idx; ++idx)
 			{
 				// 一维 idx -> 二维 (k, j)
-				size_t temp = idx;
-				int j = j_start + (temp % j_size);
-				int k = k_start + (temp / j_size);
+				int j = j_start + (idx % j_size);
+				int k = k_start + (idx / j_size);
 				const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
 				for (short ix = 0; ix < s.cnt; ++ix)
 				{
@@ -484,9 +483,8 @@ void growPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, long bgn, l
 			size_t local_nChanges = 0;
 			for (size_t idx = start_idx; idx < end_idx; ++idx)
 			{
-				size_t temp = idx;
-				int j = j_start + (temp % j_size);
-				int k = k_start + (temp / j_size);
+				int j = j_start + (idx % j_size);
+				int k = k_start + (idx / j_size);
 				const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
 				for (short ix = 0; ix < s.cnt; ++ix)
 				{
@@ -579,9 +577,8 @@ void growPoresMedEqs(const inputDataNE &cg, voxelField<int> &VElems, long bgn, l
 			size_t local_nChanges = 0;
 			for (size_t idx = start_idx; idx < end_idx; ++idx)
 			{
-				size_t temp = idx;
-				int j = j_start + (temp % j_size);
-				int k = k_start + (temp / j_size);
+				int j = j_start + (idx % j_size);
+				int k = k_start + (idx / j_size);
 				const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
 				for (short ix = 0; ix < s.cnt; ++ix)
 				{
@@ -674,9 +671,8 @@ void growPoresMedEqsLoose(const inputDataNE &cg, voxelField<int> &VElems, long b
 			size_t local_nChanges = 0;
 			for (size_t idx = start_idx; idx < end_idx; ++idx)
 			{
-				size_t temp = idx;
-				int j = j_start + (temp % j_size);
-				int k = k_start + (temp / j_size);
+				int j = j_start + (idx % j_size);
+				int k = k_start + (idx / j_size);
 				const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
 				for (short ix = 0; ix < s.cnt; ++ix)
 				{
@@ -770,9 +766,8 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems, long bgn, long l
 			size_t local_nChanges = 0;
 			for (size_t idx = start_idx; idx < end_idx; ++idx)
 			{
-				size_t temp = idx;
-				int j = j_start + (temp % j_size);
-				int k = k_start + (temp / j_size);
+				int j = j_start + (idx % j_size);
+				int k = k_start + (idx / j_size);
 				const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
 				for (short ix = 0; ix < s.cnt; ++ix)
 				{
