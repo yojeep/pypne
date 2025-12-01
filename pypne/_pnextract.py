@@ -4,6 +4,7 @@ import os
 import sys
 from io import StringIO
 from contextlib import contextmanager, nullcontext, redirect_stdout
+from pathlib import Path
 from .libcpp import pypne_cpp
 
 
@@ -18,7 +19,7 @@ def suppress_stdout():
 
     try:
         os.dup2(null_fd, original_stdout_fd)
-        with open(os.devnull, "w") as f, redirect_stdout(f):
+        with Path(os.devnull).open("w") as f, redirect_stdout(f):
             yield  # 执行代码
     finally:
         os.dup2(original_stdout, original_stdout_fd)
@@ -33,11 +34,7 @@ _false_set = {"no", "false", "f", "n", "0"}
 def str2bool(value, raise_exc=False):
     if isinstance(value, bool):
         return value
-    if (
-        isinstance(value, str)
-        or sys.version_info[0] < 3
-        and isinstance(value, basestring)
-    ):
+    if isinstance(value, str):
         value = value.lower()
         if value in _true_set:
             return True
