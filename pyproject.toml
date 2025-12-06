@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "pypne"
 version = "0.0.33"
 requires-python = ">=3.8"
-
+readme = "README.md"
 
 [tool.scikit-build]
 cmake.source-dir = "."
@@ -22,8 +22,6 @@ manylinux-pypy_x86_64-image = "manylinux_2_28"
 musllinux-x86_64-image = "musllinux_1_2"
 musllinux-aarch64-image = "musllinux_1_2"
 
-
-
 [tool.cibuildwheel.linux]
 archs = ["auto64"]
 #
@@ -34,4 +32,3 @@ archs = ["auto64"]
 archs = ["auto64"]
 
 #environment = { PIP_CONFIG_SETTINGS="build_ext -j4" }
-
