@@ -1,134 +1,113 @@
-#ifndef REFERENCE_H
-#define REFERENCE_H
-
-#include <list>
-#include <set>
-#include <stddef.h>
-#include <cmath>
-#include <vector>
-#include "typses.h"
+#pragma once
 #include "inputData.h"
+#include "typses.h"
+#include <stddef.h>
+#include <vector>
 
-class medialSurface
-{
+class medialSurface {
 public:
-	class node
-	{
-	public:
-		inline constexpr node() : i(-32768), j(-32768), k(-32768) {};
-		inline node(const node &v) : i(v.i), j(v.j), k(v.k) {};
-		inline node(const voxel &v) : i(v.i), j(v.j), k(v.k) {};
-		inline node(int ii, int jj, int kk) : i(ii), j(jj), k(kk) {};
-		inline void operator=(const node &v)
-		{
-			i = v.i;
-			j = v.j;
-			k = v.k;
-		}
-		short i, j, k;
-	};
+  class node {
+  public:
+    inline constexpr node() : i(-32768), j(-32768), k(-32768) {};
+    inline node(const node &v) : i(v.i), j(v.j), k(v.k) {};
+    inline node(const voxel &v) : i(v.i), j(v.j), k(v.k) {};
+    inline node(int ii, int jj, int kk) : i(ii), j(jj), k(kk) {};
+    inline void operator=(const node &v) {
+      i = v.i;
+      j = v.j;
+      k = v.k;
+    }
+    short i, j, k;
+  };
 
-	medialSurface(inputDataNE &cfg);
-	void setDefaults(double avgRad);
-	void paradox_pre_removeincludedballI();
-	void paradoxremoveincludedballI();
+  medialSurface(inputDataNE &cfg);
+  void setDefaults(double avgRad);
+  void paradox_pre_removeincludedballI();
+  void paradoxremoveincludedballI();
 
-	void calc_distmaps();
+  void calc_distmaps();
+  void buildvoxelspace();
+  void smoothRadius();
 
-	void calc_distmap(voxel &vit, unsigned char vValue, const voxelImage &vxls, std::vector<node> &oldAliens) const;
-	void buildvoxelspace();
-	void smoothRadius();
+  void competeForParentNoMerge(medialBall *vi, medialBall *vjv);
+  void competeForParent(medialBall *vi, medialBall *vj);
+  void findBoss(medialBall *);
+  void createBallsAndHierarchy();
 
-	void competeForParentNoMerge(medialBall *vi, medialBall *vjv);
-	void competeForParent(medialBall *vi, medialBall *vj);
-	void findBoss(medialBall *);
-	void createBallsAndHierarchy();
+  void moveUphill(medialBall *b_i);
+  void moveUphillp1(medialBall *b_i);
 
-	void moveUphill(medialBall *b_i);
-	void moveUphillp1(medialBall *b_i);
+  voxel *vxl(int i, int j, int k) {
+    if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
+      return nullptr;
 
-	voxel *vxl(int i, int j, int k)
-	{
-		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
-			return nullptr;
+    segments &s = segs_[k * ny + j];
+    int p = s.fsi(i);
+    if (p != -1) {
+      return (0 == s.s[p].value) ? (s.s[p].segV + (i - s.s[p].start)) : nullptr;
+    }
+    return nullptr;
+  }
 
-		segments &s = segs_[k * ny + j];
-		int p = s.fsi(i);
-		if (p != -1)
-		{
-			return (0 == s.s[p].value) ? (s.s[p].segV + (i - s.s[p].start)) : nullptr;
-		}
-		return nullptr;
-	}
+  const segment &segg(int i, int j, int k) const {
+    if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
+      return invalidSeg;
 
-	const segment &segg(int i, int j, int k) const
-	{
-		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
-			return invalidSeg;
+    const segments &s = segs_[k * ny + j];
+    int p = s.fsi(i);
+    if (p != -1)
+      return (s.s[p]);
+    std::cout << "Error can not find segment at " << i << " " << j << " " << k
+              << " nSegs: " << s.cnt << std::endl;
+    return (s.s[s.cnt]);
+  }
 
-		const segments &s = segs_[k * ny + j];
-		int p = s.fsi(i);
-		if (p != -1)
-			return (s.s[p]);
-		std::cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << std::endl;
-		return (s.s[s.cnt]);
-	}
+  const segment &nextSegg(int i, int j, int k) const {
+    if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
+      return invalidSeg;
 
-	const segment &nextSegg(int i, int j, int k) const
-	{
-		if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz)
-			return invalidSeg;
+    const segments &s = segs_[k * ny + j];
+    int p = s.fsi(i);
+    if (p != -1)
+      return (s.s[p + 1]);
 
-		const segments &s = segs_[k * ny + j];
-		int p = s.fsi(i);
-		if (p != -1)
-			return (s.s[p + 1]);
+    std::cout << "Error can not find next segment at " << i << " " << j << " "
+              << k << " nSegs: " << s.cnt << std::endl;
+    return (s.s[s.cnt]);
+  }
 
-		std::cout << "Error can not find next segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << std::endl;
-		return (s.s[s.cnt]);
-	}
+  bool isInside(int i, int j, int k) const {
+    return (i >= 0 && j >= 0 && k >= 0 && i < nx && j < ny && k < nz);
+  }
 
-	bool isInside(int i, int j, int k) const
-	{
-		return (i >= 0 && j >= 0 && k >= 0 && i < nx && j < ny && k < nz);
-	}
+  bool isJInside(int j) const { return (j >= 0 && j < ny); }
 
-	bool isJInside(int j) const
-	{
-		return (j >= 0 && j < ny);
-	}
-
-	bool isInside(int i) const
-	{
-		return (0 <= i && i < nx);
-	}
+  bool isInside(int i) const { return (0 <= i && i < nx); }
 
 public:
-	const inputDataNE &cg_;
-	int nx, ny, nz;
+  const inputDataNE &cg_;
+  int nx, ny, nz;
 
-	size_t nVxls;
-	size_t nBalls;
+  size_t nVxls;
+  size_t nBalls;
 
-	std::vector<segments> &segs_;
-	segment invalidSeg;
-	std::vector<voxel> vxlSpace;
-	std::vector<medialBall> ballSpace;
-	medialBall ToBeAssigned;
-	std::vector<std::vector<size_t>> iZ;
+  std::vector<segments> &segs_;
+  segment invalidSeg;
+  std::vector<voxel> vxlSpace;
+  std::vector<medialBall> ballSpace;
+  medialBall ToBeAssigned;
+  std::vector<std::vector<size_t>> iZ;
 
-	float _minRp;
-	double _clipROutx;
-	double _clipROutyz;
-	double _midRf;
-	double _MSNoise;
-	double _lenNf;
+  float _minRp;
+  double _clipROutx;
+  double _clipROutyz;
+  double _midRf;
+  double _MSNoise;
+  double _lenNf;
 
-	double _vmvRadRelNf;
+  double _vmvRadRelNf;
 
-	int _nRSmoothing;
-	double _RCorsnf;
-	float _RCorsn;
+  int _nRSmoothing;
+  double _RCorsnf;
+  float _RCorsn;
 };
-
-#endif // REFERENCE_H

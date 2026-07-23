@@ -5,7 +5,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <memory>
-#include <map>
 #include <filesystem> // Include the standard filesystem header
 #include <thread_pool/BS_thread_pool.hpp>
 #include <memory>

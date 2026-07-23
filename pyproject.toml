@@ -1,13 +1,30 @@
-[build-system]
-requires = ["scikit-build-core","pybind11","ninja"]
-build-backend = "scikit_build_core.build"
-
 [project]
 name = "pypne"
 version = "0.0.34"
-# requires-python = ">=3.8"
+dependencies = ["numpy"]
+authors = [{ name = "Jinping Yang", email = "12227053@zju.edu.cn" }]
+description = "Python package for network extraction"
+keywords = ["pore-network", "network-extraction"]
 requires-python = ">=3.13,<3.14"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+license = "Apache-2.0"
 readme = "README.md"
+
+[project.urls]
+Homepage = "https://github.com/yojeep/pypne"
+Repository = "https://github.com/yojeep/pypne"
+Issues = "https://github.com/yojeep/pypne/issues"
+
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
 
 [tool.scikit-build]
 cmake.source-dir = "."
@@ -32,4 +49,5 @@ archs = ["auto64"]
 [tool.cibuildwheel.windows]
 archs = ["auto64"]
 
-#environment = { PIP_CONFIG_SETTINGS="build_ext -j4" }
+[tool.scikit-build.build]
+tool-args = ["-j0"]

@@ -1,11 +1,11 @@
-#include "pypne.h"
-#include "blockNet.h"
-#include "profilers.h"
-#include "writers.h"
-#include <array>
-#include <iostream>
+#include <cstdint>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+
+#include "blockNet.h"
+#include "pypne.h"
+#include "writers.h"
+#include <iostream>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -39,18 +39,16 @@ py::array_t<T> vector_to_numpy(const std::vector<T> &vec) {
 }
 
 auto genextraction(int nx, int ny, int nz, double resolution,
-                   py::array_t<unsigned char> arr, py::dict config_dict,
+                   py::array_t<uint8_t> arr, py::dict config_dict,
                    int n_workers) {
   num_workers = n_workers;
   auto buf = arr.request();
-  std::vector<unsigned char> data(arr.size());
-  // auto arr_uncheck = arr.unchecked<1>();
-  // for (py::ssize_t i = 0; i < arr.size(); i++)
-  // {
-  //     data[i] = arr_uncheck(i);
-  // }
-  std::memcpy(data.data(), buf.ptr, arr.size() * sizeof(unsigned char));
-  voxelImageT_PYPNE<unsigned char> vm;
+
+  std::vector<uint8_t> data(static_cast<uint8_t *>(buf.ptr),
+                            static_cast<uint8_t *>(buf.ptr) +
+                                buf.size * buf.itemsize);
+
+  voxelImageT_PYPNE<uint8_t> vm;
   vm.setData(data);
   vm.setNnn(int3(nx, ny, nz));
   vm.setNij(nx * ny);

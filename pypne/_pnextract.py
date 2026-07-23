@@ -4,7 +4,6 @@ import os
 import sys
 from io import StringIO
 from contextlib import contextmanager, nullcontext, redirect_stdout
-from pathlib import Path
 from .libcpp import pypne_cpp
 
 

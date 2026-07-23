@@ -27,7 +27,7 @@ ${CMAKE_SOURCE_DIR}/thirdparty/edt/src
 ${CMAKE_SOURCE_DIR}/thirdparty)
 target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 if(MSVC)
-    target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTGC /MT)
+    target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTCG /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pypne_cpp PRIVATE -Ofast -Wall)
 endif()

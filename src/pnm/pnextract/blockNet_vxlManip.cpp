@@ -1,16 +1,8 @@
-#ifndef voxelImageManip_H
-#define voxelImageManip_H
 #include "blockNet.h"
 #include <atomic>
 #include <cassert>
+#include <cstddef>
 #include <vector>
-
-// #include "global.h"
-// class mapComparer  {  public:
-// bool operator() (pair<const int,short>& i1, pair<const int,short> i2) {return
-// i1.second<i2.second;}  };
-
-using namespace std; // std::pair, vector map
 
 template <typename T>
 inline void assign_voxel(voxelField<T> &from, voxelField<T> &to) {
@@ -30,8 +22,8 @@ inline void assign_voxel(voxelField<T> &from, voxelField<T> &to) {
   pool.wait();
 }
 
-size_t grow_pores(voxelField<int> &VElems, voxelField<int> &voxls, int bgn,
-                  int lst, int porValue) {
+size_t grow_pores(voxelField<int> &VElems, voxelField<int> &voxls, int &bgn,
+                  int &lst, int &unassigned) {
   assign_voxel(VElems, voxls);
   auto &pool = GlobalThreadPool::get();
   const int nz = VElems.nz(), ny = VElems.ny(), nx = VElems.nx();
@@ -42,8 +34,8 @@ size_t grow_pores(voxelField<int> &VElems, voxelField<int> &voxls, int bgn,
 
   pool.detach_blocks(
       0, total_iterations, [&](const size_t start_idx, const size_t end_idx) {
-        std::array<size_t, 3> coords{};
         size_t local_nChanges = 0;
+        std::array<size_t, 3> coords{};
         for (size_t idx = start_idx; idx < end_idx; ++idx) {
           unraveler.unravel(idx, coords);
           int z = coords[0], y = coords[1], x = coords[2];
@@ -52,26 +44,25 @@ size_t grow_pores(voxelField<int> &VElems, voxelField<int> &voxls, int bgn,
             continue;
 
           const int *pijk = &voxls(idx);
-          if (*pijk == porValue) {
-            auto try_assign = [&](auto &&v_func) -> bool {
-              auto val = v_func(pijk);
-              if (bgn <= val && val <= lst) {
-                VElems(idx) = val;
-                ++local_nChanges;
-                return true;
-              }
-              return false;
-            };
+          if (*pijk != unassigned)
+            continue;
 
-            (void)(try_assign([&](const auto &p) { return voxls.v_i(1, p); }) ||
-                   try_assign(
-                       [&](const auto &p) { return voxls.v_i(-1, p); }) ||
-                   try_assign([&](const auto &p) { return voxls.v_j(1, p); }) ||
-                   try_assign(
-                       [&](const auto &p) { return voxls.v_j(-1, p); }) ||
-                   try_assign([&](const auto &p) { return voxls.v_k(1, p); }) ||
-                   try_assign([&](const auto &p) { return voxls.v_k(-1, p); }));
-          }
+          auto try_assign = [&](auto &&v_func) -> bool {
+            auto val = v_func(pijk);
+            if (bgn <= val) {
+              VElems(idx) = val;
+              ++local_nChanges;
+              return true;
+            }
+            return false;
+          };
+
+          (void)(try_assign([&](const auto &p) { return voxls.v_i(1, p); }) ||
+                 try_assign([&](const auto &p) { return voxls.v_i(-1, p); }) ||
+                 try_assign([&](const auto &p) { return voxls.v_j(1, p); }) ||
+                 try_assign([&](const auto &p) { return voxls.v_j(-1, p); }) ||
+                 try_assign([&](const auto &p) { return voxls.v_k(1, p); }) ||
+                 try_assign([&](const auto &p) { return voxls.v_k(-1, p); }));
         }
         nChanges.fetch_add(local_nChanges, std::memory_order_relaxed);
       });
@@ -80,28 +71,28 @@ size_t grow_pores(voxelField<int> &VElems, voxelField<int> &voxls, int bgn,
   return nChanges.load();
 }
 
-size_t growPores_X2(voxelField<int> &VElems, voxelField<int> &voxls, int bgn,
-                    int lst, int porValue) {
+size_t growPores_X2(voxelField<int> &VElems, voxelField<int> &voxls, int &bgn,
+                    int &lst, int &unassigned) {
   size_t nChanges = 0;
 
   // First round
-  nChanges = grow_pores(VElems, voxls, bgn, lst, porValue);
+  nChanges = grow_pores(VElems, voxls, bgn, lst, unassigned);
   std::cout << "  ngrowX3:" << nChanges << ",";
 
   // Second round
-  nChanges = grow_pores(VElems, voxls, bgn, lst, porValue);
+  nChanges = grow_pores(VElems, voxls, bgn, lst, unassigned);
   std::cout << nChanges << ",";
 
   // Third round
-  nChanges = grow_pores(VElems, voxls, bgn, lst, porValue);
+  nChanges = grow_pores(VElems, voxls, bgn, lst, unassigned);
   std::cout << "  ngrowX2:" << nChanges << "  ";
 
   return nChanges;
 }
 
-void growPores(voxelField<int> &VElems, voxelField<int> &voxls, int bgn,
-               int lst, int porValue) {
-  size_t nChanges = grow_pores(VElems, voxls, bgn, lst, porValue);
+void growPores(voxelField<int> &VElems, voxelField<int> &voxls, int &bgn,
+               int &lst, int &unassigned) {
+  size_t nChanges = grow_pores(VElems, voxls, bgn, lst, unassigned);
   std::cout << "  ngrowPors:" << nChanges << "  ";
 }
 
@@ -128,466 +119,211 @@ inline std::pair<int, short> get_max_count_nei(const std::array<int, 6> &neis,
 
   return {most_val, most_count};
 }
-void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems,
-                        voxelField<int> &voxls, long bgn, long lst,
-                        const vector<poreNE *> &poreIs, long unassigned) {
+
+enum class GrowStrategy { MedStrict, Median, MedEqs, MedEqsLoose };
+
+struct NeighborOffset {
+  int dk, dj, di;
+};
+
+static constexpr std::array<NeighborOffset, 6> NEIGHBOR_OFFSETS = {{
+    {0, 0, -1}, // i-1
+    {0, 0, 1},  // i+1
+    {0, -1, 0}, // j-1
+    {0, 1, 0},  // j+1
+    {-1, 0, 0}, // k-1
+    {1, 0, 0}   // k+1
+}};
+
+template <GrowStrategy S>
+size_t growPoresGeneric(const inputDataNE &cg, voxelField<int> &VElems,
+                        voxelField<int> &voxls, int bgn, int lst,
+                        const std::vector<poreNE *> &poreIs, int unassigned) {
   assign_voxel(VElems, voxls);
   auto &pool = GlobalThreadPool::get();
   const int nz = VElems.nz(), ny = VElems.ny();
-  // 内部区域
-  const int j_start = 1, j_end = ny - 1;
-  const int k_start = 1, k_end = nz - 1;
-  const int j_size = j_end - j_start;
-  const int k_size = k_end - k_start;
-  const size_t total_kj = static_cast<size_t>(k_size * j_size); // collapse(2)
-  auto futures = pool.submit_blocks(
-      0, total_kj, [&](const size_t start_idx, const size_t end_idx) -> size_t {
+  const size_t total_iterations = static_cast<size_t>(nz) * ny;
+  std::atomic<size_t> nChanges(0);
+  IndexUnraveler unraveler({static_cast<size_t>(nz), static_cast<size_t>(ny)});
+
+  constexpr short thresh_nDiff = (S == GrowStrategy::MedStrict) ? 3 : 2;
+  constexpr short thresh_most = (S == GrowStrategy::MedStrict) ? 3 : 2;
+
+  pool.detach_blocks(
+      0, total_iterations, [&](const size_t start_idx, const size_t end_idx) {
         size_t local_nChanges = 0;
+        std::array<size_t, 2> coords{};
 
         for (size_t idx = start_idx; idx < end_idx; ++idx) {
-          // 一维 idx -> 二维 (k, j)
-          int j = j_start + (idx % j_size);
-          int k = k_start + (idx / j_size);
+          unraveler.unravel(idx, coords);
+          const int k = static_cast<int>(coords[0]);
+          const int j = static_cast<int>(coords[1]);
+
+          // 边界守卫：保证6个方向 ±1 均不越界
+          if (k == 0 || k == nz - 1 || j == 0 || j == ny - 1)
+            continue;
+
           const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
-          for (short ix = 0; ix < s.cnt; ++ix) {
-            for (short i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
+          for (int ix = 0; ix < s.cnt; ++ix) {
+            for (int i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
               const int *pijk = &voxls(i, j, k);
-              long pID = *pijk;
-              short nSameID = 0;
+              if (*pijk != unassigned)
+                continue;
+
+              const float R = cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 1)->R;
               short nDifferentID = 0;
+              std::array<int, 6> neis{};
+              short nei_count = 0;
 
-              if (pID >= bgn && pID <= lst) {
-                if (voxls.v_i(-1, pijk) == pID)
-                  nSameID++;
-                else if (bgn <= voxls.v_i(-1, pijk) &&
-                         lst >= voxls.v_i(-1, pijk))
-                  nDifferentID++;
-                if (voxls.v_i(1, pijk) == pID)
-                  nSameID++;
-                else if (bgn <= voxls.v_i(1, pijk) && lst >= voxls.v_i(1, pijk))
-                  nDifferentID++;
-                if (voxls.v_j(-1, pijk) == pID)
-                  nSameID++;
-                else if (bgn <= voxls.v_j(-1, pijk) &&
-                         lst >= voxls.v_j(-1, pijk))
-                  nDifferentID++;
-                if (voxls.v_j(1, pijk) == pID)
-                  nSameID++;
-                else if (bgn <= voxls.v_j(1, pijk) && lst >= voxls.v_j(1, pijk))
-                  nDifferentID++;
-                if (voxls.v_k(-1, pijk) == pID)
-                  nSameID++;
-                else if (bgn <= voxls.v_k(-1, pijk) &&
-                         lst >= voxls.v_k(-1, pijk))
-                  nDifferentID++;
-                if (voxls.v_k(1, pijk) == pID)
-                  nSameID++;
-                else if (bgn <= voxls.v_k(1, pijk) && lst >= voxls.v_k(1, pijk))
-                  nDifferentID++;
+              for (const auto &off : NEIGHBOR_OFFSETS) {
+                const int nk = k + off.dk;
+                const int nj = j + off.dj;
+                const int ni = i + off.di;
 
-                if (nDifferentID > 0 && nSameID > 0) {
-                  VElems(i, j, k) = unassigned;
+                const int neiID = voxls(ni, nj, nk);
+                if (neiID < bgn)
+                  continue;
+
+                const float neiR =
+                    cg.segs_[(nk - 1) * cg.ny + (nj - 1)].vxl(ni - 1)->R;
+
+                bool accept = false;
+                if constexpr (S == GrowStrategy::MedStrict) {
+                  accept = (neiR >= R);
+                } else if constexpr (S == GrowStrategy::Median) {
+                  accept = (neiR > R);
+                } else if constexpr (S == GrowStrategy::MedEqs) {
+                  accept = (neiR >= R);
+                } else if constexpr (S == GrowStrategy::MedEqsLoose) {
+                  accept = true;
+                }
+
+                if (!accept)
+                  continue;
+
+                ++nDifferentID;
+
+                if constexpr (S == GrowStrategy::MedStrict) {
+                  if (neiR > R)
+                    neis[nei_count++] = neiID;
+                } else {
+                  neis[nei_count++] = neiID;
+                }
+              } // end neighbor loop
+
+              if (nDifferentID >= thresh_nDiff && nei_count > 0) {
+                auto [mostID, mostCNT] = get_max_count_nei(neis, nei_count);
+                if (mostCNT >= thresh_most) {
+                  VElems(i, j, k) = mostID;
                   ++local_nChanges;
                 }
               }
             }
           }
         }
-        return local_nChanges;
+        nChanges.fetch_add(local_nChanges, std::memory_order_relaxed);
       });
-  size_t nChanges(0);
-  for (auto &future : futures) {
-    nChanges += future.get();
-  }
-  (cout << "  nRetreat:" << nChanges).flush();
+  pool.wait();
+  return nChanges.load();
 }
 
 void growPoresMedStrict(const inputDataNE &cg, voxelField<int> &VElems,
-                        voxelField<int> &voxls, long bgn, long lst,
-                        const vector<poreNE *> &poreIs, long rawValue) {
-  assign_voxel(VElems, voxls);
-  auto &pool = GlobalThreadPool::get();
-  const int nz = VElems.nz(), ny = VElems.ny();
-  const int j_start = 1, j_end = ny - 1;
-  const int k_start = 1, k_end = nz - 1;
-  const int j_size = j_end - j_start;
-  const int k_size = k_end - k_start;
-  const size_t total_iterations = static_cast<size_t>(k_size * j_size);
-  auto nChanges_futures = pool.submit_blocks(
-      0, total_iterations,
-      [&](const size_t start_idx, const size_t end_idx) -> size_t {
-        size_t local_nChanges = 0;
-        for (size_t idx = start_idx; idx < end_idx; ++idx) {
-          int j = j_start + (idx % j_size);
-          int k = k_start + (idx / j_size);
-          const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
-          for (short ix = 0; ix < s.cnt; ++ix) {
-            for (short i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
-              long pID = voxls(i, j, k);
-              const int *pijk = &voxls(i, j, k);
-
-              if (pID == rawValue) {
-                float R = cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 1)->R;
-                short nDifferentID = 0;
-                if (bgn <= voxls.v_i(-1, pijk) && lst >= voxls.v_i(-1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 2)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_i(1, pijk) && lst >= voxls.v_i(1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(-1, pijk) && lst >= voxls.v_j(-1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 2)].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(1, pijk) && lst >= voxls.v_j(1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + j].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(-1, pijk) && lst >= voxls.v_k(-1, pijk) &&
-                    cg.segs_[(k - 2) * cg.ny + (j - 1)].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(1, pijk) && lst >= voxls.v_k(1, pijk) &&
-                    cg.segs_[k * cg.ny + (j - 1)].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-
-                if (nDifferentID >= 3) {
-                  map<int, short> neis;
-
-                  long neI = voxls.v_i(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 2)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_i(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 2)].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + j].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 2) * cg.ny + (j - 1)].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[k * cg.ny + (j - 1)].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-
-                  map<int, short>::iterator neitr =
-                      max_element(neis.begin(), neis.end(), mapComparer<int>());
-                  if (neitr->second >= 3) {
-                    ++local_nChanges;
-                    VElems(i, j, k) = neitr->first;
-                  }
-                }
-              }
-            }
-          }
-        }
-        return local_nChanges;
-      });
-  size_t nChanges(0);
-  for (auto &future : nChanges_futures) {
-    nChanges += future.get();
-  }
-
-  cout << "  ngMedStrict:" << nChanges << " ";
+                        voxelField<int> &voxls, int &bgn, int &lst,
+                        const std::vector<poreNE *> &poreIs, int &unassigned) {
+  size_t nChanges = growPoresGeneric<GrowStrategy::MedStrict>(
+      cg, VElems, voxls, bgn, lst, poreIs, unassigned);
+  std::cout << "  ngMedStrict: " << nChanges << " ";
 }
 
 void growPoresMedian(const inputDataNE &cg, voxelField<int> &VElems,
-                     voxelField<int> &voxls, long bgn, long lst,
-                     const vector<poreNE *> &poreIs, long rawValue) {
-  assign_voxel(VElems, voxls);
-  auto &pool = GlobalThreadPool::get();
-  const int nz = VElems.nz(), ny = VElems.ny();
-  const int j_start = 1, j_end = ny - 1;
-  const int k_start = 1, k_end = nz - 1;
-  const int j_size = j_end - j_start;
-  const int k_size = k_end - k_start;
-  const size_t total_iterations = static_cast<size_t>(k_size * j_size);
-  auto nChanges_futures = pool.submit_blocks(
-      0, total_iterations,
-      [&](const size_t start_idx, const size_t end_idx) -> size_t {
-        size_t local_nChanges = 0;
-        for (size_t idx = start_idx; idx < end_idx; ++idx) {
-          int j = j_start + (idx % j_size);
-          int k = k_start + (idx / j_size);
-          const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
-          for (short ix = 0; ix < s.cnt; ++ix) {
-            for (short i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
-              // voxel* v=s.s[ix].v(i-1);
-              // if (v)
-
-              const int *pijk = &voxls(i, j, k);
-              long pID = *pijk;
-
-              if (pID == rawValue) {
-                float R = cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 1)->R;
-
-                short nDifferentID = 0;
-                if (bgn <= voxls.v_i(-1, pijk) && lst >= voxls.v_i(-1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 2)->R > R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_i(1, pijk) && lst >= voxls.v_i(1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i)->R > R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(-1, pijk) && lst >= voxls.v_j(-1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 2)].vxl(i - 1)->R > R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(1, pijk) && lst >= voxls.v_j(1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + j].vxl(i - 1)->R > R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(-1, pijk) && lst >= voxls.v_k(-1, pijk) &&
-                    cg.segs_[(k - 2) * cg.ny + (j - 1)].vxl(i - 1)->R > R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(1, pijk) && lst >= voxls.v_k(1, pijk) &&
-                    cg.segs_[k * cg.ny + (j - 1)].vxl(i - 1)->R > R)
-                  nDifferentID++;
-
-                if (nDifferentID >= 2) {
-                  map<int, short> neis;
-
-                  long neI = voxls.v_i(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 2)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_i(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 2)].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + j].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 2) * cg.ny + (j - 1)].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[k * cg.ny + (j - 1)].vxl(i - 1)->R > R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-
-                  map<int, short>::iterator neitr =
-                      max_element(neis.begin(), neis.end(), mapComparer<int>());
-                  if (neitr->second >= 2) {
-                    ++local_nChanges;
-                    VElems(i, j, k) = neitr->first;
-                  }
-                }
-              }
-            }
-          }
-        }
-        return local_nChanges;
-      });
-  size_t nChanges(0);
-  for (auto &future : nChanges_futures) {
-    nChanges += future.get();
-  }
-  cout << "  ngMedian:" << nChanges << " ";
+                     voxelField<int> &voxls, int &bgn, int &lst,
+                     const std::vector<poreNE *> &poreIs, int &unassigned) {
+  size_t nChanges = growPoresGeneric<GrowStrategy::Median>(
+      cg, VElems, voxls, bgn, lst, poreIs, unassigned);
+  std::cout << "  ngMedian: " << nChanges << " ";
 }
 
 void growPoresMedEqs(const inputDataNE &cg, voxelField<int> &VElems,
-                     voxelField<int> &voxls, long bgn, long lst,
-                     const vector<poreNE *> &poreIs, long rawValue) {
-  assign_voxel(VElems, voxls);
-  auto &pool = GlobalThreadPool::get();
-  const int nz = VElems.nz(), ny = VElems.ny();
-  const int j_start = 1, j_end = ny - 1;
-  const int k_start = 1, k_end = nz - 1;
-  const int j_size = j_end - j_start;
-  const int k_size = k_end - k_start;
-  const size_t total_iterations = static_cast<size_t>(k_size * j_size);
-  auto nChanges_futures = pool.submit_blocks(
-      0, total_iterations,
-      [&](const size_t start_idx, const size_t end_idx) -> size_t {
-        size_t local_nChanges = 0;
-        for (size_t idx = start_idx; idx < end_idx; ++idx) {
-          int j = j_start + (idx % j_size);
-          int k = k_start + (idx / j_size);
-          const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
-          for (short ix = 0; ix < s.cnt; ++ix) {
-            for (short i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
-              // voxel* v=s.s[ix].v(i-1);
-              // if (v)
-
-              const int *pijk = &voxls(i, j, k);
-              long pID = *pijk;
-
-              if (pID == rawValue) {
-                float R = cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 1)->R;
-
-                short nDifferentID = 0;
-                if (bgn <= voxls.v_i(-1, pijk) && lst >= voxls.v_i(-1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 2)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_i(1, pijk) && lst >= voxls.v_i(1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(-1, pijk) && lst >= voxls.v_j(-1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + (j - 2)].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(1, pijk) && lst >= voxls.v_j(1, pijk) &&
-                    cg.segs_[(k - 1) * cg.ny + j].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(-1, pijk) && lst >= voxls.v_k(-1, pijk) &&
-                    cg.segs_[(k - 2) * cg.ny + (j - 1)].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(1, pijk) && lst >= voxls.v_k(1, pijk) &&
-                    cg.segs_[k * cg.ny + (j - 1)].vxl(i - 1)->R >= R)
-                  nDifferentID++;
-
-                if (nDifferentID >= 2) {
-                  map<int, short> neis;
-
-                  long neI = voxls.v_i(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i - 2)->R >= R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_i(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 1)].vxl(i)->R >= R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + (j - 2)].vxl(i - 1)->R >= R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 1) * cg.ny + j].vxl(i - 1)->R >= R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[(k - 2) * cg.ny + (j - 1)].vxl(i - 1)->R >= R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI &&
-                      cg.segs_[k * cg.ny + (j - 1)].vxl(i - 1)->R >= R)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-
-                  map<int, short>::iterator neitr =
-                      max_element(neis.begin(), neis.end(), mapComparer<int>());
-                  if (neitr->second >= 2) {
-                    ++local_nChanges;
-                    VElems(i, j, k) = neitr->first;
-                  }
-                }
-              }
-            }
-          }
-        }
-        return local_nChanges;
-      });
-  size_t nChanges(0);
-  for (auto &future : nChanges_futures) {
-    nChanges += future.get();
-  }
-
-  cout << "  ngMedEqs:" << nChanges << "  ";
+                     voxelField<int> &voxls, int &bgn, int &lst,
+                     const std::vector<poreNE *> &poreIs, int &unassigned) {
+  size_t nChanges = growPoresGeneric<GrowStrategy::MedEqs>(
+      cg, VElems, voxls, bgn, lst, poreIs, unassigned);
+  std::cout << "  ngMedEqs: " << nChanges << " ";
 }
 
 void growPoresMedEqsLoose(const inputDataNE &cg, voxelField<int> &VElems,
-                          voxelField<int> &voxls, long bgn, long lst,
-                          const vector<poreNE *> &poreIs, long rawValue) {
+                          voxelField<int> &voxls, int &bgn, int &lst,
+                          const std::vector<poreNE *> &poreIs,
+                          int &unassigned) {
+  size_t nChanges = growPoresGeneric<GrowStrategy::MedEqsLoose>(
+      cg, VElems, voxls, bgn, lst, poreIs, unassigned);
+  std::cout << "  ngMedLoose: " << nChanges << " ";
+}
+
+void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems,
+                        voxelField<int> &voxls, int &bgn, int &lst,
+                        const std::vector<poreNE *> &poreIs, int &unassigned) {
   assign_voxel(VElems, voxls);
   auto &pool = GlobalThreadPool::get();
   const int nz = VElems.nz(), ny = VElems.ny();
-  const int j_start = 1, j_end = ny - 1;
-  const int k_start = 1, k_end = nz - 1;
-  const int j_size = j_end - j_start;
-  const int k_size = k_end - k_start;
-  const size_t total_iterations = static_cast<size_t>(k_size * j_size);
-  auto nChanges_futures = pool.submit_blocks(
-      0, total_iterations,
-      [&](const size_t start_idx, const size_t end_idx) -> size_t {
+  const size_t total_iterations = static_cast<size_t>(nz * ny);
+  std::atomic<size_t> nChanges(0);
+  IndexUnraveler unraveler({static_cast<size_t>(nz), static_cast<size_t>(ny)});
+
+  pool.detach_blocks(
+      0, total_iterations, [&](const size_t start_idx, const size_t end_idx) {
         size_t local_nChanges = 0;
+        std::array<size_t, 2> coords{};
         for (size_t idx = start_idx; idx < end_idx; ++idx) {
-          int j = j_start + (idx % j_size);
-          int k = k_start + (idx / j_size);
+          unraveler.unravel(idx, coords);
+          int k = coords[0], j = coords[1];
+          if (k == 0 || k == nz - 1 || j == 0 || j == ny - 1)
+            continue;
           const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
-          for (short ix = 0; ix < s.cnt; ++ix) {
-            for (short i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
-              // voxel* v=s.s[ix].v(i-1);
-              // if (v)
-
+          for (int ix = 0; ix < s.cnt; ++ix) {
+            for (int i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
               const int *pijk = &voxls(i, j, k);
-              long pID = *pijk;
 
-              if (pID == rawValue) {
-                //			 float R = cg.segs_[(k - 1) * cg.ny + (j
-                //- 1)].vxl(i - 1)->R;
+              int pID = *pijk;
+              if (pID < bgn)
+                continue;
+              short nSameID = 0;
+              short nDifferentID = 0;
 
-                short nDifferentID = 0;
-                if (bgn <= voxls.v_i(-1, pijk) && lst >= voxls.v_i(-1, pijk))
-                  nDifferentID++;
-                if (bgn <= voxls.v_i(1, pijk) && lst >= voxls.v_i(1, pijk))
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(-1, pijk) && lst >= voxls.v_j(-1, pijk))
-                  nDifferentID++;
-                if (bgn <= voxls.v_j(1, pijk) && lst >= voxls.v_j(1, pijk))
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(-1, pijk) && lst >= voxls.v_k(-1, pijk))
-                  nDifferentID++;
-                if (bgn <= voxls.v_k(1, pijk) && lst >= voxls.v_k(1, pijk))
-                  nDifferentID++;
-
-                if (nDifferentID >= 2) {
-                  map<int, short> neis;
-
-                  long neI = voxls.v_i(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_i(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_j(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(-1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-                  neI = voxls.v_k(1, pijk);
-                  if (neI != pID && bgn <= neI && lst >= neI)
-                    ++(neis.insert(pair<int, short>(neI, 0)).first->second);
-
-                  map<int, short>::iterator neitr =
-                      max_element(neis.begin(), neis.end(), mapComparer<int>());
-                  if (neitr->second >= 2) {
-                    ++local_nChanges;
-                    VElems(i, j, k) = neitr->first;
-                  }
+              auto visit_neighbor = [&](int neID) {
+                if (neID == pID) {
+                  ++nSameID;
+                } else if (neID >= bgn) {
+                  ++nDifferentID;
                 }
+              };
+
+              visit_neighbor(voxls.v_i(1, pijk));
+              visit_neighbor(voxls.v_i(-1, pijk));
+              visit_neighbor(voxls.v_j(1, pijk));
+              visit_neighbor(voxls.v_j(-1, pijk));
+              visit_neighbor(voxls.v_k(1, pijk));
+              visit_neighbor(voxls.v_k(-1, pijk));
+
+              if (nDifferentID > 0 && nSameID > 0) {
+                VElems(i, j, k) = unassigned;
+                ++local_nChanges;
               }
             }
           }
         }
-        return local_nChanges;
+        nChanges.fetch_add(local_nChanges, std::memory_order_relaxed);
       });
-  size_t nChanges(0);
-  for (auto &future : nChanges_futures) {
-    nChanges += future.get();
-  }
+  pool.wait();
 
-  cout << "  ngMedLoose:" << nChanges << "  ";
+  (std::cout << "  nRetreat:" << nChanges.load()).flush();
 }
 
 void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
-                voxelField<int> &voxls, long bgn, long lst,
+                voxelField<int> &voxls, int &bgn, int &lst,
                 const std::vector<poreNE *> &poreIs) {
   assign_voxel(VElems, voxls);
   auto &pool = GlobalThreadPool::get();
-
   const int nz = VElems.nz(), ny = VElems.ny();
   const size_t total_iterations = static_cast<size_t>(nz * ny);
   IndexUnraveler unraveler({static_cast<size_t>(nz), static_cast<size_t>(ny)});
@@ -600,7 +336,7 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
 
         for (size_t idx = start_idx; idx < end_idx; ++idx) {
           unraveler.unravel(idx, coords);
-          const size_t k = coords[0], j = coords[1];
+          const int k = coords[0], j = coords[1];
           if (k == 0 || k == nz - 1 || j == 0 || j == ny - 1)
             continue;
           const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
@@ -609,7 +345,7 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
               const int *pijk = &voxls(i, j, k);
               const long pID = *pijk;
 
-              if (pID < bgn || pID > lst)
+              if (pID < bgn)
                 continue;
 
               short nSameID = 0;
@@ -620,7 +356,7 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
               auto visit_neighbor = [&](long neID) {
                 if (neID == pID) {
                   ++nSameID;
-                } else if (neID >= bgn && neID <= lst) {
+                } else if (neID >= bgn) {
                   ++nDifferentID;
                   nei_buf[nei_count++] = static_cast<int>(neID);
                 }
@@ -633,7 +369,7 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
               visit_neighbor(voxls.v_k(-1, pijk));
               visit_neighbor(voxls.v_k(1, pijk));
 
-              if ((nDifferentID <= nSameID) || (nei_count == 0))
+              if (nDifferentID <= nSameID || nei_count == 0)
                 continue;
 
               auto [best_id, best_cnt] = get_max_count_nei(nei_buf, nei_count);
@@ -650,5 +386,3 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
   pool.wait();
   std::cout << "  nMedian:" << nChanges.load() << " ";
 }
-
-#endif

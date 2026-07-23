@@ -1,6 +1,5 @@
 
 #include "medialSurf.h"
-#include "blockNet.h"
 #include "edt.hpp"
 #include "globals.h"
 #include "inputData.h"
@@ -8,6 +7,10 @@
 #include <atomic>
 #include <boost/multi_array.hpp>
 #include <boost/sort/sort.hpp>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
 
 medialSurface::medialSurface(
     inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
@@ -21,21 +24,20 @@ medialSurface::medialSurface(
   nz = cfg.nz;
   auto &pool = GlobalThreadPool::get();
   const int total_iterations = nz * ny;
-  auto nVxls_future = pool.submit_blocks(
-      0, total_iterations, [&](const size_t start, const size_t end) -> int {
-        size_t local_nVxls = 0;
-        for (size_t i = start; i < end; ++i) {
-          const segments &s = cg_.segs_[i];
-          for (int ix = 0; ix < s.cnt; ++ix)
-            if (s.s[ix].value == 0)
-              local_nVxls += s.s[ix + 1].start - s.s[ix].start;
-        }
-        return local_nVxls;
-      });
-  nVxls = 0;
-  for (std::future<int> &future : nVxls_future) {
-    nVxls += future.get();
-  }
+  std::atomic<size_t> _nVxls(0);
+  pool.detach_blocks(0, total_iterations,
+                     [&](const size_t start, const size_t end) {
+                       size_t local_nVxls = 0;
+                       for (size_t i = start; i < end; ++i) {
+                         const segments &s = cg_.segs_[i];
+                         for (int ix = 0; ix < s.cnt; ++ix)
+                           if (s.s[ix].value == 0)
+                             local_nVxls += s.s[ix + 1].start - s.s[ix].start;
+                       }
+                       _nVxls.fetch_add(local_nVxls, std::memory_order_relaxed);
+                     });
+  pool.wait();
+  nVxls = _nVxls.load();
   invalidSeg.start = -10000;
   invalidSeg.value = 255;
 }
@@ -638,12 +640,10 @@ voxelImage segToVxlMesh(
   pool.detach_blocks(
       0, total_iterations, [&](const size_t start, const size_t end) {
         for (size_t iter = start; iter < end; ++iter) {
-          // 手动 collapse(2): iz = iter / ref.ny, iy = iter % ref.ny
           int iz = iter / ny;
           int iy = iter % ny;
           const segments &s = ref.segs_[iter];
           for (int ix = 0; ix < s.cnt; ++ix) {
-            // 填充值
             std::fill(&vxls(s.s[ix].start, iy, iz),
                       &vxls(s.s[ix + 1].start, iy, iz), s.s[ix].value);
           }
@@ -668,8 +668,9 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 
   auto &pool = GlobalThreadPool::get();
   uint64_t nvoxels = vxls.size();
-  std::unique_ptr<bool[]> inv_labels(new bool[nvoxels]);
+
   auto src = vxls.data_.data();
+  auto inv_labels = std::make_unique_for_overwrite<bool[]>(nvoxels);
   pool.detach_blocks(0, nvoxels,
                      [&](const size_t start_idx, const size_t end_idx) {
                        for (size_t idx = start_idx; idx < end_idx; ++idx)
@@ -677,8 +678,12 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
                      });
   pool.wait();
 
-  float *dt = edt::edt<bool>(inv_labels.get(), vxls.nx(), vxls.ny(), vxls.nz(),
-                             1.0f, 1.0f, 1.0f, false, num_workers);
+  auto dt2 = std::make_unique_for_overwrite<float[]>(nvoxels);
+
+  edt::binary_edtsq<bool>(inv_labels.get(), static_cast<int64_t>(vxls.nx()),
+                          static_cast<int64_t>(vxls.ny()),
+                          static_cast<int64_t>(vxls.nz()), 1.0f, 1.0f, 1.0f,
+                          false, num_workers, dt2.get());
 
   const double clipROutyz = _clipROutyz;
   const double clipROutx = _clipROutx;
@@ -693,7 +698,8 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
           const int x = vit.i, y = vit.j, z = vit.k;
 
           double limit =
-              static_cast<double>(dt[z * ny * nx + y * nx + x]) - 0.5;
+              static_cast<double>(std::sqrt(dt2[z * ny * nx + y * nx + x])) -
+              0.5;
 
           double iSqr = std::min(static_cast<double>(y + 2),
                                  static_cast<double>(ny - y + 1));
@@ -719,345 +725,16 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
       });
 
   pool.wait();
-  delete[] dt;
   double rBalls = totalR.load();
   double avgR = rBalls / nVxls;
 
-  // 输出最终换行
   std::cout << "\n";
-  // 获取最终 rBalls 值
   std::cout << "  average distance map = " << avgR << std::endl;
 
   if (_minRp < 0.) {
     setDefaults(avgR);
   }
 }
-
-// void medialSurface::calc_distmap(voxel &vit, unsigned char vValue, const
-// voxelImage &vxls, std::vector<node> &oldAliens) const
-// {
-
-// 	const int i = vit.i, j = vit.j, k = vit.k;
-
-// 	node nalien(i, j, -nz);
-
-// 	int epxMax = 2 * nx;
-
-// 	double frz2 = epxMax * epxMax;
-// 	int frz1 = 2, fry1 = 0;
-
-// 	if (k > 0)
-// 	{
-// 		if (vValue != vxls(i, j, k - 1))
-// 		{
-// 			nalien.i = i;
-// 			nalien.j = j;
-// 			nalien.k = k - 1;
-// 			frz2 = 1.;
-// 			frz1 = 3;
-// 			// fry1 = 0;
-// 		}
-// 		else
-// 		{
-
-// 			if (j > 0)
-// 			{
-// 				if (vValue != vxls(i, j - 1, k))
-// 				{
-// 					nalien.i = i;
-// 					nalien.j = j - 1;
-// 					nalien.k = k;
-// 					frz2 = 1.;
-// 					frz1 = 3;
-// 					// fry1 = 0;
-// 				}
-// 				else
-// 				{
-// 					const node &nalienOldi = oldAliens[(j -
-// 1) * nx + i];
-
-// 					int neilienDistSqr = (nalienOldi.i - i)
-// * (nalienOldi.i - i) + (nalienOldi.j - j) * (nalienOldi.j - j) +
-// (nalienOldi.k - k) * (nalienOldi.k - k);
-// frz2 = neilienDistSqr + 0.; 					frz1 =
-// -sqrt(neilienDistSqr) - 1; 					fry1 =
-// nalienOldi.j - j - 1; 					nalien.i =
-// nalienOldi.i; 					nalien.j = nalienOldi.j;
-// nalien.k = nalienOldi.k;
-// 				}
-// 			}
-
-// 			const node &nalienOldi = oldAliens[j * nx + i];
-// 			int neilienDistSqr = (nalienOldi.i - i) * (nalienOldi.i
-// - i) + (nalienOldi.j - j) * (nalienOldi.j - j) + (nalienOldi.k - k) *
-// (nalienOldi.k - k); 			if (neilienDistSqr < frz2)
-// 			{
-// 				nalien.i = nalienOldi.i;
-// 				nalien.j = nalienOldi.j;
-// 				nalien.k = nalienOldi.k;
-
-// 				frz2 = neilienDistSqr + 0.;
-// 				frz1 = nalienOldi.k - k - 1;
-// 				if (j == 0)
-// 					fry1 = -sqrt(frz2) - 1;
-// 			}
-// 		}
-// 	}
-// 	else if (j > 0)
-// 	{
-// 		if (vValue != vxls(i, j - 1, k))
-// 		{
-// 			nalien.i = i;
-// 			nalien.j = j - 1;
-// 			nalien.k = k;
-// 			frz2 = 1.;
-// 			frz1 = 3;
-// 			// fry1 = 0;
-// 		}
-// 		else
-// 		{
-// 			const node &nalienOldi = oldAliens[(j - 1) * nx + i];
-
-// 			int neilienDistSqr = (nalienOldi.i - i) * (nalienOldi.i
-// - i) + (nalienOldi.j - j) * (nalienOldi.j - j) + (nalienOldi.k - k) *
-// (nalienOldi.k - k); 			frz2 = neilienDistSqr + 0.;
-// frz1 = 0; 			fry1 = nalienOldi.j
-// - j - 1; 			nalien.i = nalienOldi.i;
-// nalien.j = nalienOldi.j; 			nalien.k = nalienOldi.k;
-// 		}
-// 	}
-// 	else // if(	epxMax == 2*nx)//. XXXXXX WARNING
-// 	{
-// 		if (isInside(nextSegg(i, j, k).start))
-// 		{
-// 			epxMax = nextSegg(i, j, k).start - i;
-// 			if (isInside(segg(i, j, k).start - 1) && i - (segg(i, j,
-// k).start - 1) < epxMax)
-// 			{
-// 				epxMax = i - (segg(i, j, k).start - 1);
-// 				nalien.i = (segg(i, j, k).start - 1);
-// 				nalien.j = j;
-// 				nalien.k = k;
-// 			}
-// 			else
-// 			{
-// 				nalien.i = nextSegg(i, j, k).start;
-// 				nalien.j = j;
-// 				nalien.k = k;
-// 			}
-// 		}
-// 		else if (isInside(segg(i, j, k).start - 1))
-// 		{
-// 			epxMax = std::min(i - segg(i, j, k).start + 1, epxMax);
-// 			nalien.i = (segg(i, j, k).start - 1);
-// 			nalien.j = j;
-// 			nalien.k = k;
-// 		}
-// 		else if (isInside(i))
-// 		{
-// 			epxMax = std::min(nx, std::min(ny, nz)) + 1;
-// 		}
-// 		else
-// 		{
-// 			cout << "\n\n Error: outside voxel \n\n";
-// 		}
-// 		frz2 = epxMax * epxMax + 0.;
-// 		frz1 = -epxMax;
-// 		fry1 = -epxMax;
-// 	}
-
-// 	if (epxMax <= 0) [[unlikely]]
-// 		cout << i << " " << j << " " << k << "    " << segg(i, j,
-// k).start << " " << (nextSegg(i, j, k)).start << " " << endl;
-
-// 	for (int c = std::max(frz1 - 1, -k); c <= min(int(sqrt(frz2)) + 1, nz -
-// k - 1); ++c)
-// 	{
-// 		// if( isInside(i, j, k+c))
-// 		{
-// 			const int blim = min(int(sqrt(frz2 - c * c) + 1.001), ny
-// - j - 1); 			for (int b = std::max(std::max(int(-sqrt(frz2 -
-// c * c)), fry1) - 1, -j); b <= blim; ++b)
-// 			{
-
-// 				// if(isJInside(j+b)) //
-// 				{
-// 					if (vValue != vxls(i, j + b, k + c))
-// 					{
-// 						if ((b * b + c * c) < frz2)
-// 						{
-// 							frz2 = b * b + c * c;
-// 							nalien.i = i;
-// 							nalien.j = j + b;
-// 							nalien.k = k + c;
-// 						}
-// 					}
-// 					else
-// 					{
-// 						const segment &s = segg(i, j +
-// b, k + c); 						if (s.start > 0)
-// 						{
-// 							int a = (s.start - 1 -
-// i); 							if ((a * a + b * b + c *
-// c) < frz2)
-// 							{
-// 								frz2 = a * a + b
-// * b + c * c;
-// nalien.i = i + a;
-// nalien.j = j + b;
-// nalien.k = k + c;
-// 							}
-// 						}
-
-// 						if ((&s + 1)->start < nx)
-// 						{
-// 							int a = ((&s + 1)->start
-// - i); 							if ((a * a + b *
-// b + c * c) < frz2)
-// 							{
-// 								frz2 = a * a + b
-// * b + c * c;
-// nalien.i = i + a;
-// nalien.j = j + b;
-// nalien.k = k + c;
-// 							}
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	if (!isInside(nalien.i, nalien.j, nalien.k)) [[unlikely]]
-// 	{
-// 		nalien.i = (i < nx / 2) ? -nx / 4 - 1 : nx * 5 / 4 + 1;
-// 		nalien.j = (j < ny / 2) ? -ny / 4 - 1 : ny * 5 / 4 + 1;
-// 		nalien.k = (k < nz / 2) ? -nz / 4 - 1 : nz * 5 / 4 + 1;
-// 		vit.R = sqrt((nalien.i - i) * (nalien.i - i) + (nalien.j - j) *
-// (nalien.j - j) + (nalien.k - k) * (nalien.k - k)) - 0.5;
-// 	}
-// 	else
-// 	{
-// 		int dx = abs(nalien.i - i), dy = abs(nalien.j - j), dz =
-// abs(nalien.k - k);
-
-// 		double limit = sqrt(dx * dx + dy * dy + dz * dz) - 0.5;
-// 		double iSqr = min((j + 2), (ny - j + 1));
-// 		if (iSqr < limit)
-// 			limit = max((1. - _clipROutyz) * limit + _clipROutyz *
-// iSqr, 0.01); 		iSqr = min((k + 2), (nz - k + 1));
-// if (iSqr < limit) 			limit = max((1. - _clipROutyz) * limit +
-// _clipROutyz * iSqr, 0.01); 		iSqr = min((i + 2), (nx - i + 1));
-// if (iSqr < limit) 			limit = max((1. - _clipROutx) * limit +
-// _clipROutx * iSqr, 0.1); 		vit.R = limit;
-
-// 		if (frz2 <= 0) [[unlikely]]
-// 			cout << "WTF frz2 = " << frz2 << endl;
-// 		if (nalien.i < -2000 || limit > 16000000) [[unlikely]]
-// 		{
-// 			cout << "Error i = " << nalien.i << endl;
-// 			cout << "frz2 " << frz2 << endl;
-// 			cout << "frz1 " << frz1 << endl;
-// 			cout << "i " << i << "  j " << j << "  k " << k << endl;
-// 			cout << "oldAliens[j,i]. i " << oldAliens[j * nx + i].i
-// << "  j " << oldAliens[j * nx + i].j << "  k " << oldAliens[j * nx + i].k <<
-// endl; 			exit(0);
-// 		}
-// 	}
-
-// 	oldAliens[j * nx + i] = nalien;
-// }
-
-// void medialSurface::calc_distmaps() // search  MBs at each voxel
-// {
-
-// 	cout << " computing distance map for index " << int(0);
-// 	cout.flush();
-
-// 	if (!nVxls)
-// 	{
-// 		cout << " no voxels no balls,\n"
-// 			 << endl;
-// 		return;
-// 	}
-
-// 	voxelImage vxls = segToVxlMesh(*this);
-// 	const int k = -nz / 2 - 1;
-// 	std::vector<node> oldAliens_base;
-// 	oldAliens_base.reserve((ny + 1) * nx);
-// 	for (int j = 0; j < ny + 1; ++j)
-// 		for (int i = 0; i < nx; ++i)
-// 		{
-// 			oldAliens_base.emplace_back(i, j, k);
-// 		}
-// 	std::mutex mutex;
-// 	size_t print_interval = std::max(nz / 10, 1);
-// 	std::atomic<size_t> progress_counter(0);
-// 	size_t total_iz = nz;
-// 	auto &pool = GlobalThreadPool::get();
-// 	// 并行处理 iz in [0, nz)
-// 	auto rBalls_future = pool.submit_blocks(0, nz,
-// 											[&](const
-// size_t start, const size_t end) -> double
-// 											{
-// 												//
-// 每个线程私有数据
-// thread_local std::vector<node> oldAliens = oldAliens_base;
-// // firstprivate 模拟
-// double local_rBalls = 0.0;
-// // 局部累加，减少原子操作开销
-
-// 												for
-// (size_t iz = start; iz < end; ++iz)
-// 												{
-// 													for
-// (size_t idx : iZ[iz])
-// 													{
-// 														voxel
-// &vit = vxlSpace[idx];
-// calc_distmap(vit, 0, vxls, oldAliens);
-// local_rBalls += vit.R;
-// 													}
-
-// 													//
-// 更新全局进度计数器
-// size_t current_progress = ++progress_counter;
-
-// 													//
-// 控制输出频率，避免过多 IO
-// if (current_progress % print_interval == 0 || current_progress == total_iz)
-// 													{
-// 														//
-// 线程安全输出
-// std::lock_guard<std::mutex> lock(mutex); // 需要定义全局 mutex 														float
-// percentage = (current_progress * 100.0f) / total_iz;
-// std::cout << "\r distance map calculation progress = " << percentage << "%"
-// << std::flush;
-// 													}
-// 												}
-
-// 												//
-// 提交局部结果到原子变量
-// return local_rBalls;
-// 											});
-
-// 	// 等待所有任务完成
-// 	double rBalls(0.0);
-// 	for (std::future<double> &future : rBalls_future)
-// 	{
-// 		rBalls += future.get();
-// 	}
-// 	// 输出最终换行
-// 	std::cout << "\n";
-// 	// 获取最终 rBalls 值
-// 	std::cout << "  average distance map = " << rBalls / nVxls << std::endl;
-
-// 	if (_minRp < 0.)
-// 	{
-// 		setDefaults(rBalls / nVxls);
-// 	}
-// 	return;
-// }
 
 void medialSurface::smoothRadius() {
 
@@ -1159,10 +836,8 @@ void medialSurface::smoothRadius() {
   const size_t total = vxlSpace.size();
   if (total == 0) {
     std::cout << " maxrrr 0." << std::endl;
-    return; // 或继续
+    return;
   }
-
-  // 提交任务：每个任务返回该块内的最大 R 值
   auto maxrrr_future = pool.submit_blocks(
       0, total, [&](const size_t start, const size_t end) -> float {
         float local_max = 0.0f;
@@ -1191,38 +866,35 @@ void medialSurface::
 
   for (int i = 0; i < _nRSmoothing; ++i)
     smoothRadius();
-  nBalls = 0;
-  double rBalls = 0.0f;
+
+  std::atomic<size_t> _nBalls(0);
+  std::atomic<double> rBalls(0.0);
+
   auto &pool = GlobalThreadPool::get();
   const size_t total_iterations = vxlSpace.size();
-  // 提交任务块，每个返回 (nBalls_local, rBalls_local)
-  auto nBalls_rBalls_futures = pool.submit_blocks(
-      0, total_iterations,
-      [&](const size_t start, const size_t end) -> std::pair<size_t, double> {
-        size_t local_nBalls = 0;
-        double local_rBalls = 0.0;
+  pool.detach_blocks(0, total_iterations,
+                     [&](const size_t start, const size_t end) {
+                       size_t local_nBalls = 0;
+                       double local_rBalls = 0.0;
 
-        for (size_t i = start; i < end; ++i) {
-          voxel &v = vxlSpace[i];
-          if (v.R >= _minRp) {
-            v.ball = &ToBeAssigned;
-            ++local_nBalls;
-            local_rBalls += v.R;
-          } else {
-            v.ball = nullptr;
-          }
-        }
+                       for (size_t i = start; i < end; ++i) {
+                         voxel &v = vxlSpace[i];
+                         if (v.R >= _minRp) {
+                           v.ball = &ToBeAssigned;
+                           ++local_nBalls;
+                           local_rBalls += v.R;
+                         } else {
+                           v.ball = nullptr;
+                         }
+                       }
+                       _nBalls.fetch_add(local_nBalls);
+                       rBalls.fetch_add(local_rBalls);
+                     });
+  pool.wait();
+  nBalls = _nBalls.load();
 
-        return std::make_pair(local_nBalls, local_rBalls);
-      });
-
-  for (auto &future : nBalls_rBalls_futures) {
-    auto [local_nBalls, local_rBalls] = future.get();
-    nBalls += local_nBalls;
-    rBalls += local_rBalls;
-  }
   std::cout << "\n  number of potential maximal spheres: " << nBalls
-            << ",  average radius = " << rBalls / nBalls << std::endl;
+            << ",  average radius = " << rBalls.load() / nBalls << std::endl;
 
   paradox_pre_removeincludedballI();
 
