@@ -1,0 +1,48 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+
+# Python
+*.pyc
+.eggs
+*.egg-info
+
+.pytest_cache
+cpp/test
+
+src/edt.cpp
+
+test.py
+test2.py
+test3.py
+test4.py

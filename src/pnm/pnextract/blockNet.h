@@ -1,9 +1,7 @@
-#ifndef BLOCKNET_H
-#define BLOCKNET_H
+#pragma once
 
-#include <map>
-#include <fstream>
-
+#include <vector>
+#include <cstddef>
 #include "inputData.h"
 #include "medialSurf.h"
 
@@ -61,7 +59,7 @@ public:
 	std::vector<throatNE *> throatIs;
 
 	std::vector<medialBall *> allSpace;
-	vector<medialBall *> throadAdditBalls;
+	std::vector<medialBall *> throadAdditBalls;
 
 	int nNodes;
 	int nTrots;
@@ -70,29 +68,65 @@ public:
 	const int maxNCors;
 };
 
+class IndexUnraveler
+{
+private:
+	std::vector<size_t> strides_;
+	std::vector<size_t> shape_;
+
+public:
+	explicit IndexUnraveler(const std::vector<size_t> &shape)
+		: shape_(shape.begin(), shape.end())
+	{
+		const size_t ndim = shape_.size();
+		strides_.resize(ndim);
+		if (ndim > 0)
+		{
+			strides_.back() = 1;
+			for (size_t i = ndim - 1; i > 0; --i)
+			{
+				strides_[i - 1] = strides_[i] * shape_[i];
+			}
+		}
+	}
+
+	template <typename CoordsT>
+	void unravel(size_t flat_idx, CoordsT &coords) const
+	{
+		// assert(coords.size() == shape_.size() && "Coords size must match shape");
+
+		size_t remainder = flat_idx;
+		const size_t n = shape_.size();
+		for (size_t i = 0; i < n; ++i)
+		{
+			coords[i] = remainder / strides_[i];
+			remainder %= strides_[i];
+		}
+	}
+};
+
 // void growPores_XX(voxelField<int>&  VElems, int min, int max, int porValue);
 // void shrinkPores(voxelField<int>&  VElems, int min, int max, int porValue);
 
-size_t growPores_X2(voxelField<int> &VElems, int min, int max, int porValue);
+size_t growPores_X2(voxelField<int> &VElems, voxelField<int> &voxls, int min, int max, int porValue);
 
-void growPores(voxelField<int> &VElems, int min, int max, int porValue);
+void growPores(voxelField<int> &VElems, voxelField<int> &voxls, int min, int max, int porValue);
 
-void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, long min, long max,
+void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, voxelField<int> &voxls, long min, long max,
 						const std::vector<poreNE *> &poreIs, long rawValue);
 
-void growPoresMedStrict(const inputDataNE &cg, voxelField<int> &VElems, long min, long max,
+void growPoresMedStrict(const inputDataNE &cg, voxelField<int> &VElems, voxelField<int> &voxls, long min, long max,
 						const std::vector<poreNE *> &poreIs, long rawValue);
 
-void growPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, long min, long max,
+void growPoresMedian(const inputDataNE &cg, voxelField<int> &VElems, voxelField<int> &voxls, long min, long max,
 					 const std::vector<poreNE *> &poreIs, long rawValue);
 
-void growPoresMedEqs(const inputDataNE &cg, voxelField<int> &VElems, long min, long max,
+void growPoresMedEqs(const inputDataNE &cg, voxelField<int> &VElems, voxelField<int> &voxls, long min, long max,
 					 const std::vector<poreNE *> &poreIs, long rawValue);
 
-void growPoresMedEqsLoose(const inputDataNE &cg, voxelField<int> &VElems, long min, long max,
+void growPoresMedEqsLoose(const inputDataNE &cg, voxelField<int> &VElems, voxelField<int> &voxls, long min, long max,
 						  const std::vector<poreNE *> &poreIs, long rawValue);
 
-void medianElem(const inputDataNE &cg, voxelField<int> &VElems, long min, long max,
+void medianElem(const inputDataNE &cg, voxelField<int> &VElems, voxelField<int> &voxls, long min, long max,
 				const std::vector<poreNE *> &poreIs);
 
-#endif

@@ -23,6 +23,7 @@ PRIVATE
 ${CMAKE_SOURCE_DIR}/src/include
 ${CMAKE_SOURCE_DIR}/src/libvoxel
 ${CMAKE_SOURCE_DIR}/thirdparty/pybind11-3.0.1/include
+${CMAKE_SOURCE_DIR}/thirdparty/edt/src
 ${CMAKE_SOURCE_DIR}/thirdparty)
 target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 if(MSVC)

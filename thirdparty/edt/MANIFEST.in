@@ -1,0 +1,6 @@
+include src/edt.hpp
+include src/edt_voxel_graph.hpp
+include src/threadpool.h
+include src/edt.pyx
+include COPYING
+include COPYING.LESSER

@@ -126,5 +126,18 @@
         "climits": "cpp",
         "ciso646": "cpp",
         "version": "cpp"
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "files.exclude": {
+        "**/build": true,
+        "*/cmake-build-": true,
+        "**/out": true,
+        "**/Debug": true,
+        "**/Release": true
+    },
+    "search.exclude": {
+        "**/build": true,
+        "*/cmake-build-": true
     }
 }

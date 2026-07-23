@@ -1,4 +1,3 @@
-
 #include "blockNet.h"
 
 // #include "vxlImage_manip.h"
@@ -24,7 +23,7 @@ void blockNetwork::createMedialSurface(medialSurface *&srf, inputDataNE &cfg, si
 void blockNetwork::CreateVElem(size_t startValue)
 { /// ### map pore labels from maximal spheres to the image blockNetwork::VElems, standing for VoxelElements.
 
-	cout << "\n\nCreating pore elements:" << endl;
+	std::cout << "\n\nCreating pore elements:" << std::endl;
 
 	if (poreIs.empty())
 	{
@@ -80,7 +79,7 @@ void blockNetwork::CreateVElem(size_t startValue)
 			for (int ix = 0; ix < s.cnt; ++ix)
 			{
 				int value = -1 - int(s.s[ix].value);
-				nVVs = max(nVVs, value);
+				nVVs = std::max(nVVs, value);
 				for (int i = s.s[ix].start; i < s.s[ix + 1].start; ++i)
 				{
 					VElems(i + 1, iy + 1, iz + 1) = value;
@@ -126,12 +125,12 @@ void blockNetwork::CreateVElem(size_t startValue)
 				poreIs.push_back(tmp);
 			}
 		}
-		cout << "\n created " << poreIs.size() << " pores (+boundaries)  for up to index " << 0 << endl;
+		std::cout << "\n created " << poreIs.size() << " pores (+boundaries)  for up to index " << 0 << std::endl;
 		lastPores = (poreIs.size() - 1);
 
 		const int firstPoreInd = firstPores;
 		const int lastPoreInd = lastPores;
-		cout << " mapping pores indices to image, for index " << 0 << ":  " << firstPores << " to " << lastPores << ",  unasigned:" << uasyned << endl;
+		std::cout << " mapping pores indices to image, for index " << 0 << ":  " << firstPores << " to " << lastPores << ",  unasigned:" << uasyned << std::endl;
 
 		for (const auto &bi : balspc)
 			if (bi.boss)
@@ -149,19 +148,19 @@ void blockNetwork::CreateVElem(size_t startValue)
 				int r2 = std::pow(std::max(R * 0.25 - 1., 1.001), 2);
 
 				float ex = std::sqrt(r2);
-				for (float xpa = max((x - ex), 0.5f); xpa <= min((x + ex), cg.nx - 0.5f); xpa += 1.0f)
+				for (float xpa = std::max((x - ex), 0.5f); xpa <= std::min((x + ex), cg.nx - 0.5f); xpa += 1.0f)
 				{
 					float remain_y = r2 - (xpa - x) * (xpa - x);
 					if (remain_y <= 0.f)
 						continue;
 					float ey = std::sqrt(remain_y);
-					for (float ypb = max((y - ey), 0.5f); ypb <= min((y + ey), cg.ny - 0.5f); ypb += 1.0f)
+					for (float ypb = std::max((y - ey), 0.5f); ypb <= std::min((y + ey), cg.ny - 0.5f); ypb += 1.0f)
 					{
 						float remain_z = remain_y - (ypb - y) * (ypb - y);
 						if (remain_z <= 0.f)
 							continue;
 						float ez = std::sqrt(remain_z);
-						for (float zpc = max((z - ez), 0.5f); zpc <= min((z + ez), cg.nz - 0.5f); zpc += 1.0f)
+						for (float zpc = std::max((z - ez), 0.5f); zpc <= std::min((z + ez), cg.nz - 0.5f); zpc += 1.0f)
 						{
 							int idj = VElems(xpa + 1, ypb + 1, zpc + 1);
 							if (idj == (-1 - int(0)))
@@ -183,139 +182,140 @@ void blockNetwork::CreateVElem(size_t startValue)
 				}
 			}
 
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		cout << endl;
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		cout << endl;
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedStrict(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		cout << endl;
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		cout << endl;
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
+		voxelField<int> voxls = VElems;
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		std::cout << std::endl;
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		std::cout << std::endl;
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		std::cout << std::endl;
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		std::cout << std::endl;
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
 
-		cout << endl;
+		std::cout << std::endl;
 
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		cout << endl;
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		cout << endl;
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		cout << endl;
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores_X2(VElems, firstPores, lastPores, uasyned);
-		growPores_X2(VElems, firstPores, lastPores, uasyned);
-		growPores_X2(VElems, firstPores, lastPores, uasyned);
-		growPores_X2(VElems, firstPores, lastPores, uasyned);
-		cout << endl;
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		std::cout << std::endl;
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		std::cout << std::endl;
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		std::cout << std::endl;
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores_X2(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores_X2(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores_X2(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores_X2(VElems, voxls, firstPores, lastPores, uasyned);
+		std::cout << std::endl;
 
-		medianElem(cg, VElems, firstPores, lastPores, poreIs);
-		medianElem(cg, VElems, firstPores, lastPores, poreIs);
-		medianElem(cg, VElems, firstPores, lastPores, poreIs);
+		medianElem(cg, VElems, voxls, firstPores, lastPores, poreIs);
+		medianElem(cg, VElems, voxls, firstPores, lastPores, poreIs);
+		medianElem(cg, VElems, voxls, firstPores, lastPores, poreIs);
 
-		medianElem(cg, VElems, firstPores, lastPores, poreIs);
-		medianElem(cg, VElems, firstPores, lastPores, poreIs);
+		medianElem(cg, VElems, voxls, firstPores, lastPores, poreIs);
+		medianElem(cg, VElems, voxls, firstPores, lastPores, poreIs);
 
-		cout << endl;
+		std::cout << std::endl;
 
-		growPores(VElems, firstPores, lastPores, uasyned);
-		while (growPores_X2(VElems, firstPores, lastPores, uasyned))
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		while (growPores_X2(VElems, voxls, firstPores, lastPores, uasyned))
 			;
-		growPores(VElems, firstPores, lastPores, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
 
-		cout << endl;
+		std::cout << std::endl;
 
-		retreatPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
+		retreatPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
 
 		for (const auto &bi : balspc)
 		{
 			medialBall *mastrSphere = bi.mastrSphere();
 			VElems(bi.fi + 1, bi.fj + 1, bi.fk + 1) = VElems(mastrSphere->fi + 1, mastrSphere->fj + 1, mastrSphere->fk + 1);
 		}
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedian(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores_X2(VElems, firstPores, lastPores, uasyned);
-		growPoresMedEqs(cg, VElems, firstPores, lastPores, poreIs, uasyned);
-		growPores(VElems, firstPores, lastPores, uasyned);
-		growPores_X2(VElems, firstPores, lastPores, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedian(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores_X2(VElems, voxls, firstPores, lastPores, uasyned);
+		growPoresMedEqs(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
+		growPores(VElems, voxls, firstPores, lastPores, uasyned);
+		growPores_X2(VElems, voxls, firstPores, lastPores, uasyned);
 
-		cout << endl;
+		std::cout << std::endl;
 
-		medianElem(cg, VElems, firstPores, lastPores, poreIs);
+		medianElem(cg, VElems, voxls, firstPores, lastPores, poreIs);
 		for (const auto &bi : balspc)
 		{
 			medialBall *mastrSphere = bi.mastrSphere();
 			VElems(bi.fi + 1, bi.fj + 1, bi.fk + 1) = VElems(mastrSphere->fi + 1, mastrSphere->fj + 1, mastrSphere->fk + 1);
 		}
-		growPoresMedEqsLoose(cg, VElems, firstPores, lastPores, poreIs, uasyned);
+		growPoresMedEqsLoose(cg, VElems, voxls, firstPores, lastPores, poreIs, uasyned);
 		int label = firstPore;
 		for (const auto &bi : balspc)
 		{
@@ -326,7 +326,7 @@ void blockNetwork::CreateVElem(size_t startValue)
 			}
 		}
 
-		cout << endl;
+		std::cout << std::endl;
 	}
 }
 
@@ -335,8 +335,8 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 
 	// vector<int> iThroatFaces; iThroatFaces.reserve(throatIs.size()+poreIs.size()*10);
 	{
-		cout << "\nlooking for connections, iFirst = " << throatIs.size() << " ..  ";
-		cout.flush();
+		std::cout << "\nlooking for connections, iFirst = " << throatIs.size() << " ..  ";
+		std::cout.flush();
 
 		for (int i = 0; i < VElems.nx() - 1; i++)
 			for (int k = 1; k < VElems.nz() - 1; ++k)
@@ -362,14 +362,14 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 								poreNE *p2 = poreIs[p2ID];
 
 								if (!p1)
-									cout << "  ERROR p1ID" << p1ID << endl;
+										std::cout << "  ERROR p1ID" << p1ID << std::endl;
 								int tIDNext = throatIs.size();
 								std::pair<std::map<int, int>::iterator, bool> ret = p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
 								if (ret.second)
 								{
 
 									if (ret.second != p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext)).second)
-										cout << "Errorpnm821-2 " << p1ID << " " << p2ID << endl;
+										std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID << std::endl;
 									throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
 									// if (p1ID<2 &&p2ID<2) cout <<"Errskziw1: p1ID<2 &&p2ID<2: tid: "<< tIDNext<<"  "<<i<<" "<<j<<" "<<k<<" " <<"  "<<p1->mb->fi<<" "<<p1->mb->fj<<" "<<p1->mb->fk<<" "<<"   "<<p2->mb->fi<<" "<<p2->mb->fj<<" "<<p2->mb->fk<<" "<<endl;
 								}
@@ -391,7 +391,7 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 					}
 				}
 
-		(cout << throatIs.size() << " .. ").flush();
+				(std::cout << throatIs.size() << " .. ").flush();
 
 		for (int j = 0; j < VElems.ny() - 1; j++) //     y >-<
 			for (int k = 1; k < VElems.nz() - 1; ++k)
@@ -417,13 +417,13 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 								poreNE *p2 = poreIs[p2ID];
 
 								if (!p1)
-									cout << "  ERROR p1ID" << p1ID << endl;
+										std::cout << "  ERROR p1ID" << p1ID << std::endl;
 								int tIDNext = throatIs.size();
 								std::pair<std::map<int, int>::iterator, bool> ret = p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
 								if (ret.second)
 								{
 									if (ret.second != p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext)).second)
-										cout << "Errorpnm821-2 " << p1ID << " " << p2ID << endl;
+										std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID << std::endl;
 									throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
 									// if (p1ID<2 &&p2ID<2) cout <<"Errskziw2: p1ID<2 &&p2ID<2: tid: "<< tIDNext<<endl;
 								}
@@ -440,7 +440,7 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 					}
 				}
 
-		(cout << throatIs.size() << " .. ").flush();
+				(std::cout << throatIs.size() << " .. ").flush();
 
 		for (int k = 0; k < VElems.nz() - 1; ++k) //     z >-<
 			for (int j = 1; j < VElems.ny() - 1; ++j)
@@ -465,13 +465,13 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 								poreNE *p2 = poreIs[p2ID];
 
 								if (!p1)
-									cout << "  ERROR p1ID" << p1ID << endl;
+										std::cout << "  ERROR p1ID" << p1ID << std::endl;
 								int tIDNext = throatIs.size();
 								std::pair<std::map<int, int>::iterator, bool> ret = p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
 								if (ret.second)
 								{
 									if (ret.second != p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext)).second)
-										cout << "Errorpnm821-2 " << p1ID << " " << p2ID << endl;
+										std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID << std::endl;
 									throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
 									// if (p1ID<2 &&p2ID<2) cout <<"Errskziw3: p1ID<2 &&p2ID<2: tid: "<< tIDNext<<endl;
 								}
@@ -488,27 +488,27 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 					}
 				}
 
-		(cout << throatIs.size() << ", ").flush();
+				(std::cout << throatIs.size() << ", ").flush();
 	}
 
-	cout << " nThroats: " << throatIs.size() << endl;
+	std::cout << " nThroats: " << throatIs.size() << std::endl;
 
 	nNodes = poreIs.size();
 	nTrots = throatIs.size();
 	nElems = nNodes + nTrots;
 
-	cout << "nElems:  " << nElems << " = " << poreIs.size() << " + " << throatIs.size() << endl;
+	std::cout << "nElems:  " << nElems << " = " << poreIs.size() << " + " << throatIs.size() << std::endl;
 
 	throadAdditBalls.reserve(throatIs.size() * 5); // to improve the efficiency when later generating and storing new maximal balls for throat surfaces
 
-	cout << "\ncalc throat properties: ";
-	cout.flush();
+				std::cout << "\ncalc throat properties: ";
+				std::cout.flush();
 
 	{
-		cout << " collecting face voxels,  ";
-		cout.flush();
+				std::cout << " collecting face voxels,  ";
+				std::cout.flush();
 
-		for (auto tr : throatIs)
+				for (auto tr : throatIs)
 		{
 			tr->toxels2.reserve(abs(tr->CrosArea[0]) + abs(tr->CrosArea[1]) + abs(tr->CrosArea[2]) + 1);
 			tr->toxels1.reserve(abs(tr->CrosArea[0]) + abs(tr->CrosArea[1]) + abs(tr->CrosArea[2]) + 1);
@@ -561,20 +561,20 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 			}
 		}
 		if (nMultiTouchErrors > 0)
-			cout << "\n   Warning: " << nMultiTouchErrors << " voxels being in touch to more than two pores" << endl;
+				std::cout << "\n   Warning: " << nMultiTouchErrors << " voxels being in touch to more than two pores" << std::endl;
 	}
 
 	for (auto tr : throatIs)
 	{
 		if (tr->toxels2.empty() || tr->toxels2.empty())
-			(cout << "  ERROR1017, toxls size:" << tr->toxels2.size() << " " << tr->toxels1.size() << "  ").flush();
+			(std::cout << "  ERROR1017, toxls size:" << tr->toxels2.size() << " " << tr->toxels1.size() << "  ").flush();
 
 		sort(tr->toxels2.begin(), tr->toxels2.end(), metaballcomparer());
 		sort(tr->toxels1.begin(), tr->toxels1.end(), metaballcomparer());
 	}
 
-	cout << " calculating throat radii";
-	cout.flush();
+	std::cout << " calculating throat radii";
+	std::cout.flush();
 	for (throatNE *tr : throatIs)
 	{
 		if (tr->toxels2.size() > 0)
@@ -587,7 +587,7 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 
 				medialBall *mvi = vbi->mastrSphere();
 				if (mvi != nullptr && mvi != vbi && tr->e2 != VElems(mvi->fi + 1, mvi->fj + 1, mvi->fk + 1))
-					cout << " Dmb2rrr  " << VElems(mvi->fi + 1, mvi->fj + 1, mvi->fk + 1) << "   ";
+						std::cout << " Dmb2rrr  " << VElems(mvi->fi + 1, mvi->fj + 1, mvi->fk + 1) << "   ";
 			}
 			else
 			{
@@ -608,7 +608,7 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 
 				medialBall *mvi = vbi->mastrSphere();
 				if (mvi && mvi != vbi && tr->e1 != VElems(mvi->fi + 1, mvi->fj + 1, mvi->fk + 1))
-					cout << " Dmb1rrr  " << VElems(mvi->fi + 1, mvi->fj + 1, mvi->fk + 1) << "   ";
+						std::cout << " Dmb1rrr  " << VElems(mvi->fi + 1, mvi->fj + 1, mvi->fk + 1) << "   ";
 			}
 			else
 			{
@@ -619,7 +619,7 @@ void blockNetwork::createNewThroats(medialSurface *&srf)
 		}
 	}
 
-	cout << "." << endl;
+				std::cout << "." << std::endl;
 }
 
 #include "blockNet_write_cnm.cpp"

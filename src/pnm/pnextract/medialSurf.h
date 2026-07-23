@@ -70,7 +70,7 @@ public:
 		int p = s.fsi(i);
 		if (p != -1)
 			return (s.s[p]);
-		cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
+		std::cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << std::endl;
 		return (s.s[s.cnt]);
 	}
 
@@ -84,7 +84,7 @@ public:
 		if (p != -1)
 			return (s.s[p + 1]);
 
-		cout << "Error can not find next segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
+		std::cout << "Error can not find next segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << std::endl;
 		return (s.s[s.cnt]);
 	}
 

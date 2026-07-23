@@ -5,7 +5,7 @@
 #include "voxelImage.h"
 #include "ElementGNE.h"
 #include <boost/multi_array.hpp>
-using namespace std;
+
 
 #ifndef PORORANGE_H
 #define PORORANGE_H
@@ -29,7 +29,7 @@ inline int createSample_input_nextract(std::string fnam, std::string opts)
 
 	ensure(!std::ifstream(fnam), "\n\nFile " + fnam + " exists,\n" + "  to run simulation: rerun with " + fnam + " as the only argument \n" + "  to regenerate: delete it and try again,\n or provide a different file name:\n" + "   pnextract -g input_pnextract.mhd\n", -1);
 
-	ofstream of(fnam);
+	std::ofstream of(fnam);
 	if (opts == "-g")
 	{
 		of << "ObjectType =  Image\n"
@@ -84,14 +84,14 @@ inline int createSample_input_nextract(std::string fnam, std::string opts)
 		   << "// write_medialSurface:	true\n"
 		   << "// write_throatHierarchy:	true\n"
 		   << "// write_vtkNetwork:	true\n"
-		   << endl;
+		   << std::endl;
 	}
 	else
-		cout << "Error unknown option (first argument)" << endl;
+		std::cout << "Error unknown option (first argument)" << std::endl;
 
 	of.close();
 
-	cout << " file " << fnam << " generated, edit: set Image size, name etc, and rerun\n";
+	std::cout << " file " << fnam << " generated, edit: set Image size, name etc, and rerun\n";
 	return 0;
 }
 
@@ -112,13 +112,13 @@ public:
 		if (imgfrmt[0] != '.')
 			imgfrmt = "." + imgfrmt;
 		imgExt(imgfrmt);
-		cout << "DefaultImageFormat: " << imgfrmt << endl;
+		std::cout << "DefaultImageFormat: " << imgfrmt << std::endl;
 
 		nBP6 = getOr("multiDir", false) ? 6 : 2;
 
-		cout << " voxel indices:" << endl;
+		std::cout << " voxel indices:" << std::endl;
 		_rockTypes.push_back(poroRange("void", 0, 0));
-		cout << "  " << 0 << ": void voxels " << endl;
+		std::cout << "  " << 0 << ": void voxels " << std::endl;
 
 		std::istringstream iss;
 
@@ -134,19 +134,19 @@ public:
 				rt.first = lower;
 				rt.second = upper;
 				if (rt.first > rt.second)
-					cout << "  Wrong entries for keyword \"" << rt.name + "_range" << "\":  lower value is higher than upper value" << endl;
+					std::cout << "  Wrong entries for keyword \"" << rt.name + "_range" << "\":  lower value is higher than upper value" << std::endl;
 			}
 
 			for (size_t j = rt.first; j <= rt.second; ++j)
 				segValues[j] = i;
 
-			cout << "  " << rt.name << " voxel values: [" << int(rt.first) << " " << int(rt.second) << "]" << endl;
+			std::cout << "  " << rt.name << " voxel values: [" << int(rt.first) << " " << int(rt.second) << "]" << std::endl;
 		}
 
-		cout << "  Voxel value indices:";
+		std::cout << "  Voxel value indices:";
 		for (size_t i = 0; i <= 12; ++i)
-			cout << " " << segValues[i];
-		cout << " ... " << endl;
+			std::cout << " " << segValues[i];
+		std::cout << " ... " << std::endl;
 	}
 
 	void readImage()
@@ -160,7 +160,7 @@ public:
 		// Assert(giv("ElementDataFile") || kwrd("read").size()
 
 		// std::string dataType("mhd");  giv("ElementType", dataType) || giv("fileType", dataType);
-		cout << " Image file: " << fnam << endl;
+		std::cout << " Image file: " << fnam << std::endl;
 
 		// VImage.reset(nx,ny,nz,255);
 		// if (dataType == "microct")	VImage.readMicroCT(fnam);
@@ -185,13 +185,13 @@ public:
 		VImage.printInfo();
 
 		nInside = (long long)(nx)*ny * nz;
-		cout << " siz:" << VImage.size3() << " vxlSize:" << vxlSize << " X0:" << X0 << endl;
+		std::cout << " siz:" << VImage.size3() << " vxlSize:" << vxlSize << " X0:" << X0 << std::endl;
 
 		int2 outrange;
 		if (giv("outside_range", outrange))
 		{
 			forAllcp(VImage) if (outrange.a <= (*cp) && (*cp) <= outrange.b)-- nInside;
-			cout << " outside_range: " << outrange << "; inside_fraction: " << nInside / (double(nx) * ny * nz) << endl;
+			std::cout << " outside_range: " << outrange << "; inside_fraction: " << nInside / (double(nx) * ny * nz) << std::endl;
 		}
 	}
 
@@ -241,7 +241,7 @@ public:
 						if (ss.s == nullptr)
 						{
 							std::lock_guard<std::mutex> lock(mutex);
-							cout << "\n   iz " << iz << " iy " << iy << " cnt" << cnt << " ERROR XX XX" << endl;
+							std::cout << "\n   iz " << iz << " iy " << iy << " cnt" << cnt << " ERROR XX XX" << std::endl;
 						}
 
 						// 复制 segTmp 到 ss.s
@@ -252,11 +252,11 @@ public:
 							if (i > 0 && ss.s[i].value == ss.s[i - 1].value)
 							{
 								std::lock_guard<std::mutex> lock(mutex);
-								cout << "\n   ERROR XXX" << i << " "
+								std::cout << "\n   ERROR XXX" << i << " "
 									 << int(ss.s[i - 1].value) << " " << int(ss.s[i].value) << "    "
 									 << int(segValues[3]) << "    "
 									 << int(VImage(ss.s[i - 1].start, iy, iz)) << " "
-									 << int(VImage(ss.s[i].start, iy, iz)) << endl;
+									 << int(VImage(ss.s[i].start, iy, iz)) << std::endl;
 							}
 						}
 						ss.s[cnt].start = nx;
@@ -276,15 +276,15 @@ public:
 			}
 		}
 
-		cout << endl;
+		std::cout << std::endl;
 		size_t nVInsids = 0;
 		for_i(_rockTypes)
 		{
 			nVInsids += nVxlVs[i];
-			cout << " " << i << ". " << _rockTypes[i].name << ": " << nVxlVs[i] << " voxels, " << nVxlVs[i] / (double(0.01 * nx) * ny * nz) << "%" << endl;
+			std::cout << " " << i << ". " << _rockTypes[i].name << ": " << nVxlVs[i] << " voxels, " << nVxlVs[i] / (double(0.01 * nx) * ny * nz) << "%" << std::endl;
 		}
 		ensure(nVInsids > double(0.01 * nx) * ny * nz, "too low porosity, set 'void_range' maybe?", -1);
-		cout << endl;
+		std::cout << std::endl;
 	}
 
 	const segment *segptr(int i, int j, int k) const
@@ -298,7 +298,7 @@ public:
 		if (p != -1)
 			return s.s + p;
 
-		cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << endl;
+		std::cout << "Error can not find segment at " << i << " " << j << " " << k << " nSegs: " << s.cnt << std::endl;
 		return (s.s + s.cnt);
 	}
 

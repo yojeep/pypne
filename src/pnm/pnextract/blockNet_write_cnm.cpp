@@ -28,20 +28,20 @@ void blockNetwork::writePNM() const
 
 	/// ### First we compute the classical network model parameters,
 	/// #### throat radii, shape factors and lengths,
-	vector<double> t_radiuss(nTrots, 0.);	 //
-	vector<double> t_shapeFacts(nTrots, 0.); //
-	vector<double> t_lengthP1toP2s(nTrots, 0.);
-	vector<double> t_lp1s(nTrots, 0.);	//
-	vector<double> t_lp2s(nTrots, 0.);	//
-	vector<double> t_ltrot(nTrots, 0.); // throat portion of t_lengthP1toP2s
+	std::vector<double> t_radiuss(nTrots, 0.);	 //
+	std::vector<double> t_shapeFacts(nTrots, 0.); //
+	std::vector<double> t_lengthP1toP2s(nTrots, 0.);
+	std::vector<double> t_lp1s(nTrots, 0.);	//
+	std::vector<double> t_lp2s(nTrots, 0.);	//
+	std::vector<double> t_ltrot(nTrots, 0.); // throat portion of t_lengthP1toP2s
 
 	/// #### pore radii, shape factors and lengths.
-	vector<double> p_radiuss(nNodes, 0.);
-	vector<double> p_shape1s(nNodes, 0.);
-	vector<double> p_physlengths(nNodes, 0.);
+	std::vector<double> p_radiuss(nNodes, 0.);
+	std::vector<double> p_shape1s(nNodes, 0.);
+	std::vector<double> p_physlengths(nNodes, 0.);
 
 	dbl3 checkSumAt(0., 0., 0.);
-	cout << "\ncalcThroats:" << endl;
+	std::cout << "\ncalcThroats:" << std::endl;
 	int lengthP1toP2Warnings = 0;
 	double nBelowAllowedG(0.), nAboveAllowedG(0.), totalArea(0.);
 
@@ -108,11 +108,11 @@ void blockNetwork::writePNM() const
 		t_lp2s[ti] = lp2 * 1.;
 		t_ltrot[ti] = lthroat * 1;
 	}
-	cout << " P1-to-P2 length < 3    for " << lengthP1toP2Warnings << " throats" << endl;
-	cout << " shapefactor: belowAllowedG " << nBelowAllowedG / totalArea * 100 << "%   aboveAllowedG " << nAboveAllowedG / totalArea * 100 << "%" << endl;
-	cout << " checkSumAt: " << checkSumAt << endl;
+	std::cout << " P1-to-P2 length < 3    for " << lengthP1toP2Warnings << " throats" << std::endl;
+	std::cout << " shapefactor: belowAllowedG " << nBelowAllowedG / totalArea * 100 << "%   aboveAllowedG " << nAboveAllowedG / totalArea * 100 << "%" << std::endl;
+	std::cout << " checkSumAt: " << checkSumAt << std::endl;
 
-	cout << "calc Pores" << endl;
+	std::cout << "calc Pores" << std::endl;
 
 	/// ### Compute pore  parameters
 	for (int pid = 2; pid < nNodes; ++pid)
@@ -152,13 +152,13 @@ void blockNetwork::writePNM() const
 
 	if (nBP6 != 2)
 	{
-		cout << "Skipping write of incompatible old network format." << endl;
+		std::cout << "Skipping write of incompatible old network format." << std::endl;
 		return;
 	}
 
 	const double dx = cg.vxlSize;
-	cout << "Writing throats";
-	cout.flush();
+	std::cout << "Writing throats";
+	std::cout.flush();
 
 	{ /// ### write  _link1.dat file
 		FILE *fil = fopen((cg.name() + "_link1.dat").c_str(), "w");
@@ -184,11 +184,11 @@ void blockNetwork::writePNM() const
 		}
 		fclose(fil);
 	}
-	cout << ".\n";
-	cout.flush();
+	std::cout << ".\n";
+	std::cout.flush();
 
-	cout << "Writing pores";
-	cout.flush();
+	std::cout << "Writing pores";
+	std::cout.flush();
 	{ /// ### write  _node1.dat file
 		FILE *fil = fopen((cg.name() + "_node1.dat").c_str(), "w");
 		fprintf(fil, "%6d  %E  %E  %E\n", int(poreIs.size()) - 2, cg.nx * dx, cg.ny * dx, cg.nz * dx);
@@ -245,6 +245,6 @@ void blockNetwork::writePNM() const
 		fclose(fil);
 	}
 
-	cout << ".\n";
-	cout.flush();
+	std::cout << ".\n";
+	std::cout.flush();
 }

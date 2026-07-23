@@ -58,3 +58,4 @@ thirdparty/**/bin/
 *.exe
 *.out
 *.app
+/.history
