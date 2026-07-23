@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 4.2)
 # set(CMAKE_C_COMPILER clang)
 # set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
+
 project(pypne_project LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_BUILD_TYPE Release)
@@ -22,14 +23,17 @@ target_include_directories(pypne_cpp
 PRIVATE
 ${CMAKE_SOURCE_DIR}/src/include
 ${CMAKE_SOURCE_DIR}/src/libvoxel
-${CMAKE_SOURCE_DIR}/thirdparty/pybind11-3.0.1/include
+${CMAKE_SOURCE_DIR}/thirdparty/pybind11/include
 ${CMAKE_SOURCE_DIR}/thirdparty/edt/src
 ${CMAKE_SOURCE_DIR}/thirdparty)
 target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTCG /MT)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(pypne_cpp PRIVATE -Ofast -Wall)
+    target_compile_options(pypne_cpp PRIVATE -O3 -Wall)
 endif()
 
 install(TARGETS pypne_cpp LIBRARY DESTINATION pypne/libcpp)
+
+
+

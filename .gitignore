@@ -59,3 +59,4 @@ thirdparty/**/bin/
 *.out
 *.app
 /.history
+/build_wheels

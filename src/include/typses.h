@@ -1543,7 +1543,7 @@ void NaNsToMean(piece<T> vs)
 template <class T>
 T med_closer(vars<T> vs, T orig)
 {
-	if (vs.size() & 1 == 0)
+	if ((vs.size() & 1) == 0)
 	{
 		const auto nth = vs.begin() + vs.size() / 2 - 1;
 		std::nth_element(vs.begin(), nth, vs.end());

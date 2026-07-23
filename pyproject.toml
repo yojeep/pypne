@@ -5,16 +5,17 @@ dependencies = ["numpy"]
 authors = [{ name = "Jinping Yang", email = "12227053@zju.edu.cn" }]
 description = "Python package for network extraction"
 keywords = ["pore-network", "network-extraction"]
-requires-python = ">=3.13,<3.14"
+# requires-python = ">=3.13,<3.14"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: C++",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
 ]
 license = "Apache-2.0"
 readme = "README.md"
+
 
 [project.urls]
 Homepage = "https://github.com/yojeep/pypne"
@@ -22,14 +23,17 @@ Repository = "https://github.com/yojeep/pypne"
 Issues = "https://github.com/yojeep/pypne/issues"
 
 [build-system]
-requires = ["scikit-build-core", "pybind11"]
+requires = ["scikit-build-core>1.0", "cmake>=4.2"]
 build-backend = "scikit_build_core.build"
 
-
 [tool.scikit-build]
-cmake.source-dir = "."
-cmake.args = ["-G", "Ninja"]
+build-dir = "build_wheels/{wheel_tag}"
 cmake.build-type = "Release"
+cmake.args = ["-G", "Ninja"]
+cmake.source-dir = "."
+
+[tool.scikit-build.env]
+CMAKE_BUILD_PARALLEL_LEVEL = { env = "MAX_JOBS", "default" = "8" }
 
 ### 0.0.13 is the last version that supports Centos7 !!!
 ### 0.0.15 is the last version that only use single thread !!!
@@ -37,17 +41,21 @@ cmake.build-type = "Release"
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 manylinux-pypy_x86_64-image = "manylinux_2_28"
-musllinux-x86_64-image = "musllinux_1_2"
-musllinux-aarch64-image = "musllinux_1_2"
+skip = ["*musllinux*"]
+# musllinux-x86_64-image = "musllinux_1_2"
+# musllinux-aarch64-image = "musllinux_1_2"
+
 
 [tool.cibuildwheel.linux]
 archs = ["auto64"]
+# before-build = "yum install -y clang"
+# before-build = "yum install -y llvm-toolset-7.0 || apt-get install -y clang"
+# environment = "CC=clang CXX=clang++"
+
+
 #
 #[tool.cibuildwheel.macos]
 #archs = ["auto64"]
 #
 [tool.cibuildwheel.windows]
 archs = ["auto64"]
-
-[tool.scikit-build.build]
-tool-args = ["-j0"]

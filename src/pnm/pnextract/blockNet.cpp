@@ -534,10 +534,10 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
     std::cout.flush();
 
     for (auto tr : throatIs) {
-      tr->toxels2.reserve(abs(tr->CrosArea[0]) + abs(tr->CrosArea[1]) +
-                          abs(tr->CrosArea[2]) + 1);
-      tr->toxels1.reserve(abs(tr->CrosArea[0]) + abs(tr->CrosArea[1]) +
-                          abs(tr->CrosArea[2]) + 1);
+      tr->toxels2.reserve(std::abs(tr->CrosArea[0]) + std::abs(tr->CrosArea[1]) +
+                          std::abs(tr->CrosArea[2]) + 1);
+      tr->toxels1.reserve(std::abs(tr->CrosArea[0]) + std::abs(tr->CrosArea[1]) +
+                          std::abs(tr->CrosArea[2]) + 1);
     }
 
     int nMultiTouchErrors = 0;

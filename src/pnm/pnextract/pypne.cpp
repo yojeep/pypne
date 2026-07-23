@@ -38,9 +38,9 @@ py::array_t<T> vector_to_numpy(const std::vector<T> &vec) {
   );
 }
 
-auto genextraction(int nx, int ny, int nz, double resolution,
-                   py::array_t<uint8_t> arr, py::dict config_dict,
-                   int n_workers) {
+auto genextraction(const int nx, const int ny, const int nz,
+                   const double resolution, const py::array_t<uint8_t> &arr,
+                   py::dict config_dict, const int n_workers) {
   num_workers = n_workers;
   auto buf = arr.request();
 

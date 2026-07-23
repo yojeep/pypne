@@ -9,21 +9,16 @@ from .libcpp import pypne_cpp
 
 @contextmanager
 def suppress_stdout():
-    """
-    mute stdout(Python + C/C++)
-    """
-    original_stdout_fd = sys.stdout.fileno()
-    original_stdout = os.dup(original_stdout_fd)
-    null_fd = os.open(os.devnull, os.O_WRONLY)
-
+    sys.stdout.flush()
+    saved = os.dup(1)
     try:
-        os.dup2(null_fd, original_stdout_fd)
-        with Path(os.devnull).open("w") as f, redirect_stdout(f):
-            yield  # 执行代码
+        with Path(os.devnull).open("w") as devnull:
+            os.dup2(devnull.fileno(), 1)
+            with redirect_stdout(devnull):
+                yield
     finally:
-        os.dup2(original_stdout, original_stdout_fd)
-        os.close(null_fd)
-        os.close(original_stdout)
+        os.dup2(saved, 1)
+        os.close(saved)
 
 
 _true_set = {"yes", "true", "t", "y", "1"}
@@ -109,7 +104,7 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
     change the arguments to values you want.
     """
     Path_cwd = Path.cwd()
-    default_config = {
+    cfg = {
         "write_Statoil": False,
         "write_radius": False,
         "write_elements": False,
@@ -120,39 +115,39 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
         "write_poreMaxBalls": False,
         "write_throatMaxBalls": False,
         "write_all": False,
-        "output_path": (Path_cwd).resolve(),
+        "output_path": Path_cwd.resolve(),
         "name": "pn",
         "minRPore": None,
         "medialSurfaceSettings": None,
     }
 
-    if config_settings is not None:
-        default_config.update(config_settings)
-    default_config = {k: v for k, v in default_config.items() if v is not None}
-    default_config = {str(k): str(v) for k, v in default_config.items()}
-    if str2bool(default_config["write_all"]):
-        for k in default_config:
+    if config_settings:
+        cfg.update(config_settings)
+    cfg = {str(k): str(v) for k, v in cfg.items() if v is not None}
+
+    if cfg["output_path"] is not None:
+        cfg["output_path"] = Path(cfg["output_path"]).resolve()
+
+    if str2bool(cfg["write_all"]):
+        for k in cfg:
             if k.startswith("write_"):
-                default_config[k] = "true"
-    anything2write = any(
-        str2bool(default_config[k]) for k in default_config if k.startswith("write_")
-    )
-    if anything2write:
-        os.makedirs(default_config["output_path"], exist_ok=True)
-        default_config["output_path"] = os.path.join(
-            default_config["output_path"], default_config["name"]
-        )
-        default_config.pop("name")
-    else:
-        default_config.pop("output_path")
-        default_config.pop("name")
-    image = image.astype(np.uint8)
+                cfg[k] = "true"
+
+    need_write = any(str2bool(v) for k, v in cfg.items() if k.startswith("write_"))
+    if need_write:
+        Path(cfg["output_path"]).mkdir(parents=True, exist_ok=True)
+        cfg["output_path"] = str(Path(cfg["output_path"]) / cfg["name"])
+
+    cfg.pop("name", None)
+    if not need_write:
+        cfg.pop("output_path", None)
+    image = image.astype(np.uint8, copy=False)
     nz, ny, nx = image.shape
     # 直接根据 verbose 决定是否使用 suppress_stdout
     n_workers = os.cpu_count() if n_workers <= 0 else min(n_workers, os.cpu_count())
     with suppress_stdout() if not verbose else nullcontext():
         res = pypne_cpp.pnextract(
-            nx, ny, nz, resolution, image.reshape(-1), default_config.copy(), n_workers
+            nx, ny, nz, resolution, image.reshape(-1), cfg.copy(), n_workers
         )
     image_VElems = res["VElems"].reshape(nz + 2, ny + 2, nx + 2)
     pn = res["pn"]
@@ -239,8 +234,8 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
     pn["throat.volume"] = link2_arr["throat_volume"]
     pn["throat.clay_volume"] = link2_arr["throat_clay_volume"]
 
-    if str2bool(default_config["write_elements"]):
+    if str2bool(cfg["write_elements"]):
         image_VElems.astype(np.int32, copy=False).tofile(
-            default_config["output_path"] + "_VElems.raw"
+            f"{cfg['output_path']}_VElems_{image_VElems.shape[2]}x{image_VElems.shape[1]}x{image_VElems.shape[0]}_s32_le.raw"
         )
     return image_VElems, pn

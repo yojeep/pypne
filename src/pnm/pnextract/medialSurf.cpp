@@ -67,17 +67,17 @@ void medialSurface::setDefaults(double avgR) {
     std::cout << " minimum pore radius: " << _minRp << std::endl;
   else
     std::cout << " keyword \"minRPore\" not found, default value ("
-              << abs(_minRp) << ") will be used" << std::endl;
+              << std::abs(_minRp) << ") will be used" << std::endl;
 
   _clipROutx = 0.05;
   _clipROutyz = 0.98;
   _midRf = 0.7;
-  _MSNoise = 1. * abs(_minRp) + 1.;
+  _MSNoise = 1. * std::abs(_minRp) + 1.;
   _lenNf = 0.6;
   _vmvRadRelNf = 1.1;
   _nRSmoothing = 3;
   _RCorsnf = 0.15;
-  _RCorsn = abs(_minRp);
+  _RCorsn = std::abs(_minRp);
 
   if (cg_.nBP6 == 6)
     _clipROutyz = _clipROutx;
@@ -325,7 +325,7 @@ void medialSurface::moveUphill(medialBall *b_i) // const
     if (vjm && vjp) {
       float gp = vjp->R - vi->R;
       float gm = vi->R - vjm->R;
-      if (abs(gp - gm) > 0.01)
+      if (std::abs(gp - gm) > 0.01)
         disp.x = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
@@ -335,7 +335,7 @@ void medialSurface::moveUphill(medialBall *b_i) // const
     if (vjm && vjp) {
       float gp = vjp->R - vi->R;
       float gm = vi->R - vjm->R;
-      if (abs(gp - gm) > 0.01)
+      if (std::abs(gp - gm) > 0.01)
         disp.y = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
@@ -345,7 +345,7 @@ void medialSurface::moveUphill(medialBall *b_i) // const
     if (vjm && vjp) {
       float gp = vjp->R - vi->R;
       float gm = vi->R - vjm->R;
-      if (abs(gp - gm) > 0.01)
+      if (std::abs(gp - gm) > 0.01)
         disp.z = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
@@ -374,7 +374,7 @@ void medialSurface::moveUphillp1(medialBall *bi) // const
       float gp = vjp->R - vi->R;
       float gm = vi->R - vjm->R;
       grad.x = 0.5 * (gp + gm);
-      if (abs(gp - gm) > 0.01)
+      if (std::abs(gp - gm) > 0.01)
         disp.x = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
@@ -385,7 +385,7 @@ void medialSurface::moveUphillp1(medialBall *bi) // const
       float gp = vjp->R - vi->R;
       float gm = vi->R - vjm->R;
       grad.y = 0.5 * (gp + gm);
-      if (abs(gp - gm) > 0.01)
+      if (std::abs(gp - gm) > 0.01)
         disp.y = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
@@ -396,7 +396,7 @@ void medialSurface::moveUphillp1(medialBall *bi) // const
       float gp = vjp->R - vi->R;
       float gm = vi->R - vjm->R;
       grad.z = 0.5 * (gp + gm);
-      if (abs(gp - gm) > 0.01)
+      if (std::abs(gp - gm) > 0.01)
         disp.z = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
