@@ -1,1 +1,14 @@
+name: My Workflow
 
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run something
+        run: echo "Hello from manual trigger!"
