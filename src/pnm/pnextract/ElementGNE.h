@@ -171,7 +171,7 @@ public:
 	int level() const
 	{
 		const medialBall *current = this;
-		short count = 1;
+		int count = 1;
 
 		while (current != current->boss)
 		{
