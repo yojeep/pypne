@@ -46,7 +46,6 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
     resolution : resolution of the image, default is 1.0
     verbose : whether to print the progress of the algorithm, default is False
 
-
     return :
     1. extracted image, which shape is (nz+2, ny+2, nx+2)
     2. pore network(pn).
@@ -70,7 +69,7 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
     'throat.conduit_lengths_pore2'
     'throat.length'
     'throat.volume'
-
+    'throat.clay_volume'
 
     config_settings: a dictionary containing the following keys:
     write_Statoil:false,
@@ -83,13 +82,12 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
     write_poreMaxBalls:false,
     write_throatMaxBalls:false,
 
-
     output_path : path to output file, using default value "./pn(with desired suffix)"
 
     minRPore: minimum radius of pore, using default value _minRp=min(1.25, avgR*0.25)+0.5
 
     medialSurfaceSettings: medial surface settings, using the following default values:
-    _clipROutx=0.05;
+        _clipROutx=0.05;
         _clipROutyz=0.98;
         _midRf=0.7;
         _MSNoise=1.*abs(_minRp)+1.;
