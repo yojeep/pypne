@@ -15,20 +15,32 @@ template <typename T> double sq(T x) {
   return static_cast<double>(x) * static_cast<double>(x);
 }
 
+
+
 inline void tofinite(float *f, const int64_t voxels) {
-  for (int64_t i = 0; i < voxels; i++) {
-    if (std::isinf(f[i])) {
-      f[i] = std::numeric_limits<float>::max() - 1;
-    }
-  }
+  auto &pool = GlobalThreadPool::get();
+  pool.detach_blocks(0, static_cast<size_t>(voxels),
+                     [&](const size_t start, const size_t end) {
+                       for (size_t i = start; i < end; i++) {
+                         if (std::isinf(f[i])) {
+                           f[i] = std::numeric_limits<float>::max() - 1;
+                         }
+                       }
+                     });
+  pool.wait();
 }
 
 inline void toinfinite(float *f, const int64_t voxels) {
-  for (int64_t i = 0; i < voxels; i++) {
-    if (f[i] >= std::numeric_limits<float>::max() - 1) {
-      f[i] = INFINITY;
-    }
-  }
+  auto &pool = GlobalThreadPool::get();
+  pool.detach_blocks(0, static_cast<size_t>(voxels),
+                     [&](const size_t start, const size_t end) {
+                       for (size_t i = start; i < end; i++) {
+                         if (f[i] >= std::numeric_limits<float>::max() - 1) {
+                           f[i] = INFINITY;
+                         }
+                       }
+                     });
+  pool.wait();
 }
 
 /* 1D Euclidean Distance Transform for Multiple Segids
@@ -382,7 +394,7 @@ float *_binary_edt3dsq(T *binaryimg, const int64_t sx, const int64_t sy,
 
   auto &pool = GlobalThreadPool::get();
 
-  // ---------- Pass 1: X direction (already detach_blocks) ----------
+  // ---------- Pass 1: X direction ----------
   {
     size_t total_iterations = sz * sy;
     pool.detach_blocks(

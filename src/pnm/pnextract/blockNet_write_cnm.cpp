@@ -1,4 +1,5 @@
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "blockNet.h"
 
 inline double randomG() /// to randomly distribute the shape factors, in case of errors

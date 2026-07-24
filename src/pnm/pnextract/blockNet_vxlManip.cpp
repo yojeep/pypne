@@ -340,8 +340,8 @@ void medianElem(const inputDataNE &cg, voxelField<int> &VElems,
           if (k == 0 || k == nz - 1 || j == 0 || j == ny - 1)
             continue;
           const segments &s = cg.segs_[(k - 1) * cg.ny + (j - 1)];
-          for (short ix = 0; ix < s.cnt; ++ix) {
-            for (short i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
+          for (int ix = 0; ix < s.cnt; ++ix) {
+            for (int i = s.s[ix].start + 1; i <= s.s[ix + 1].start; ++i) {
               const int *pijk = &voxls(i, j, k);
               const long pID = *pijk;
 

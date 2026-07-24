@@ -17,20 +17,20 @@ ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/pypne.cpp
 ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/medialSurf.cpp
 ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vtk.cpp
 ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/writers_vxl.cpp
-${CMAKE_SOURCE_DIR}/src/libvoxel/voxelImage.cpp)
+${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel/voxelImage.cpp)
 
 target_include_directories(pypne_cpp
 PRIVATE
 ${CMAKE_SOURCE_DIR}/src/include
-${CMAKE_SOURCE_DIR}/src/libvoxel
 )
 
 target_include_directories(pypne_cpp
 SYSTEM PRIVATE
-${CMAKE_SOURCE_DIR}/thirdparty/system/boost
-${CMAKE_SOURCE_DIR}/thirdparty/system/thread_pool
+${CMAKE_SOURCE_DIR}/thirdparty/system
 ${CMAKE_SOURCE_DIR}/thirdparty/system/pybind11/include
+${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel
 )
+
 
 target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 if(MSVC)
