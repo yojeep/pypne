@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <memory>
 #include <filesystem> // Include the standard filesystem header
-#include <thread_pool/BS_thread_pool.hpp>
+#include <BS_thread_pool.hpp>
 #include <memory>
 inline int num_workers(1);
 #pragma once

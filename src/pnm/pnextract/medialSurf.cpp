@@ -1,6 +1,6 @@
 
 #include "medialSurf.h"
-#include "edt.hpp"
+#include "edt.h"
 #include "globals.h"
 #include "inputData.h"
 #include "typses.h"

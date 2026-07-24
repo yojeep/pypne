@@ -23,9 +23,16 @@ target_include_directories(pypne_cpp
 PRIVATE
 ${CMAKE_SOURCE_DIR}/src/include
 ${CMAKE_SOURCE_DIR}/src/libvoxel
+)
+
+target_include_directories(pypne_cpp
+SYSTEM PRIVATE
+${CMAKE_SOURCE_DIR}/thirdparty/boost
+${CMAKE_SOURCE_DIR}/thirdparty/thread_pool
 ${CMAKE_SOURCE_DIR}/thirdparty/pybind11/include
-${CMAKE_SOURCE_DIR}/thirdparty/edt/src
-${CMAKE_SOURCE_DIR}/thirdparty)
+
+)
+
 target_compile_definitions(pypne_cpp PRIVATE BOOST_DISABLE_ASSERTS)
 if(MSVC)
     target_compile_options(pypne_cpp PRIVATE /O2 /W1 /GL /LTCG /MT)
