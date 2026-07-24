@@ -4,7 +4,6 @@
 #include "InputFile.h"
 #include "voxelImage.h"
 #include "ElementGNE.h"
-#include <boost/multi_array.hpp>
 
 
 #ifndef PORORANGE_H

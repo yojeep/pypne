@@ -5,7 +5,6 @@
 #include "inputData.h"
 #include "typses.h"
 #include <atomic>
-#include <boost/multi_array.hpp>
 #include <boost/sort/sort.hpp>
 #include <cmath>
 #include <cstddef>
