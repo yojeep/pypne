@@ -1,0 +1,5 @@
+add_executable(test_pypne test.cpp)
+target_include_directories(test_pypne PUBLIC ${CMAKE_SOURCE_DIR}/src/pnm/pnextract PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty/system)
+
+
+add_compile_options(-O3)

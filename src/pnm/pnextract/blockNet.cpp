@@ -1,4 +1,5 @@
 #include "blockNet.h"
+#include <vector>
 
 // #include "vxlImage_manip.h"
 
@@ -124,64 +125,72 @@ void blockNetwork::CreateVElem(
               << " pores (+boundaries)  for up to index " << 0 << std::endl;
     lastPores = (poreIs.size() - 1);
 
-    const int firstPoreInd = firstPores;
-    const int lastPoreInd = lastPores;
+    // const int firstPoreInd = firstPores;
+    // const int lastPoreInd = lastPores;
     std::cout << " mapping pores indices to image, for index " << 0 << ":  "
               << firstPores << " to " << lastPores << ",  unasigned:" << uasyned
               << std::endl;
+    auto &binary_image = cg.VImage.data_;
+    for (const auto &bi : balspc) {
+      // if (!bi.boss)
+      //   continue;
 
-    for (const auto &bi : balspc)
-      if (bi.boss) {
-        medialBall *mastrSphere = bi.mastrSphere();
-        float apmi(mastrSphere->fi), bpmi(mastrSphere->fj),
-            cpmi(mastrSphere->fk);
-        int VElemV = VElems(apmi + 1, bpmi + 1, cpmi + 1);
-        ensure(VElemV > 0 && VElemV < len(poreIs));
+      medialBall *mastrSphere = bi.mastrSphere();
 
-        const float x = bi.fi, y = bi.fj, z = bi.fk;
-        apmi = x - mastrSphere->fi;
-        bpmi = y - mastrSphere->fj;
-        cpmi = z - mastrSphere->fk;
-        float R = bi.R;
-        int r2 = std::pow(std::max(R * 0.25 - 1., 1.001), 2);
+      int Vm =
+          VElems(mastrSphere->fi + 1, mastrSphere->fj + 1, mastrSphere->fk + 1);
+      // ensure(VElemV > 0 && VElemV < len(poreIs));
 
-        float ex = std::sqrt(r2);
-        for (float xpa = std::max((x - ex), 0.5f);
-             xpa <= std::min((x + ex), cg.nx - 0.5f); xpa += 1.0f) {
-          float remain_y = r2 - (xpa - x) * (xpa - x);
-          if (remain_y <= 0.f)
+      const float zo = bi.fk, yo = bi.fj, xo = bi.fi;
+
+      float r = bi.R;
+      int rz2 = std::pow(std::max(r * 0.25f - 1.f, 1.001f), 2);
+      float rz = std::sqrtf(rz2);
+      for (float zf = std::max(zo - rz, 0.5f);
+           zf < std::min(zo + rz, cg.nz - 0.5f) + 1e-6f; zf += 1.0f) {
+        float ry2 = rz2 - std::pow(zf - zo, 2);
+        if (ry2 <= 0.f)
+          continue;
+        float ry = std::sqrtf(ry2);
+        for (float yf = std::max(yo - ry, 0.5f);
+             yf < std::min(yo + ry, cg.ny - 0.5f) + 1e-6f; yf += 1.0f) {
+          float rx2 = ry2 - std::pow(yf - yo, 2);
+          if (rx2 <= 0.f)
             continue;
-          float ey = std::sqrt(remain_y);
-          for (float ypb = std::max((y - ey), 0.5f);
-               ypb <= std::min((y + ey), cg.ny - 0.5f); ypb += 1.0f) {
-            float remain_z = remain_y - (ypb - y) * (ypb - y);
-            if (remain_z <= 0.f)
+          float rx = std::sqrtf(rx2);
+          for (float xf = std::max(xo - rx, 0.5f);
+               xf < std::min(xo + rx, cg.nx - 0.5f) + 1e-6f; xf += 1.0f) {
+            int z = static_cast<int>(zf);
+            int y = static_cast<int>(yf);
+            int x = static_cast<int>(xf);
+
+            if (x < 0 || y < 0 || z < 0 || x >= cg.nx || y >= cg.ny ||
+                z >= cg.nz ||
+                binary_image[z * cg.ny * cg.nx + y * cg.nx + x] != 0)
               continue;
-            float ez = std::sqrt(remain_z);
-            for (float zpc = std::max((z - ez), 0.5f);
-                 zpc <= std::min((z + ez), cg.nz - 0.5f); zpc += 1.0f) {
-              int idj = VElems(xpa + 1, ypb + 1, zpc + 1);
-              if (idj == (-1 - int(0)))
-                VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV;
-              else if (VElemV != idj &&
-                       (firstPoreInd <= idj && idj <= lastPoreInd)) {
-                voxel *vj = srf->vxl(xpa, ypb, zpc);
-                if (!vj->ball && vj->R < R) {
-                  const medialBall *mvj = poreIs[idj]->mb;
-                  float amj = xpa - mvj->fi, bmj = ypb - mvj->fj,
-                        cmj = zpc - mvj->fk;
-                  float ami = xpa - mastrSphere->fi,
-                        bmi = ypb - mastrSphere->fj,
-                        cmi = zpc - mastrSphere->fk;
-                  if (ami * ami + bmi * bmi + cmi * cmi <
-                      amj * amj + bmj * bmj + cmj * cmj)
-                    VElems(xpa + 1, ypb + 1, zpc + 1) = VElemV; // elem->id;
-                }
+            int zVE = z + 1;
+            int yVE = y + 1;
+            int xVE = x + 1;
+            int Vi = VElems(xVE, yVE, zVE);
+            if (Vi == uasyned)
+              VElems(xVE, yVE, zVE) = Vm;
+            else if (Vi != Vm) {
+              voxel *vi = srf->vxl(x, y, z);
+              if (!vi->ball && vi->R < r) {
+                const medialBall *bvi = poreIs[Vi]->mb;
+                float zif = zf - bvi->fk, yif = yf - bvi->fj,
+                      xif = xf - bvi->fi;
+                float zmf = zf - mastrSphere->fk, ymf = yf - mastrSphere->fj,
+                      xmf = xf - mastrSphere->fi;
+                if (zmf * zmf + ymf * ymf + xmf * xmf <
+                    zif * zif + yif * yif + xif * xif)
+                  VElems(xVE, yVE, zVE) = Vm; // elem->id;
               }
             }
           }
         }
       }
+    }
 
     voxelField<int> voxls = VElems;
     growPoresMedStrict(cg, VElems, voxls, firstPores, lastPores, poreIs,
@@ -534,9 +543,11 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
     std::cout.flush();
 
     for (auto tr : throatIs) {
-      tr->toxels2.reserve(std::abs(tr->CrosArea[0]) + std::abs(tr->CrosArea[1]) +
+      tr->toxels2.reserve(std::abs(tr->CrosArea[0]) +
+                          std::abs(tr->CrosArea[1]) +
                           std::abs(tr->CrosArea[2]) + 1);
-      tr->toxels1.reserve(std::abs(tr->CrosArea[0]) + std::abs(tr->CrosArea[1]) +
+      tr->toxels1.reserve(std::abs(tr->CrosArea[0]) +
+                          std::abs(tr->CrosArea[1]) +
                           std::abs(tr->CrosArea[2]) + 1);
     }
 

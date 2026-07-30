@@ -1,24 +1,30 @@
 #pragma once
 #include "inputData.h"
 #include "typses.h"
+#include "voxelmap.h"
+#include <array>
+#include <cstdint>
+#include <mdspan>
+#include <span>
 #include <stddef.h>
 #include <vector>
+#include <voxelImage.h>
 
 class medialSurface {
 public:
-  class node {
-  public:
-    inline constexpr node() : i(-32768), j(-32768), k(-32768) {};
-    inline node(const node &v) : i(v.i), j(v.j), k(v.k) {};
-    inline node(const voxel &v) : i(v.i), j(v.j), k(v.k) {};
-    inline node(int ii, int jj, int kk) : i(ii), j(jj), k(kk) {};
-    inline void operator=(const node &v) {
-      i = v.i;
-      j = v.j;
-      k = v.k;
-    }
-    short i, j, k;
-  };
+  // class node {
+  // public:
+  //   inline constexpr node() : i(-32768), j(-32768), k(-32768) {};
+  //   inline node(const node &v) : i(v.i), j(v.j), k(v.k) {};
+  //   inline node(const voxel &v) : i(v.i), j(v.j), k(v.k) {};
+  //   inline node(int ii, int jj, int kk) : i(ii), j(jj), k(kk) {};
+  //   inline void operator=(const node &v) {
+  //     i = v.i;
+  //     j = v.j;
+  //     k = v.k;
+  //   }
+  //   short i, j, k;
+  // };
 
   medialSurface(inputDataNE &cfg);
   void setDefaults(double avgRad);
@@ -87,16 +93,21 @@ public:
 public:
   const inputDataNE &cg_;
   int nx, ny, nz;
-
-  size_t nVxls;
-  size_t nBalls;
+  size_t nVxls{0};
+  size_t nBalls{0};
 
   std::vector<segments> &segs_;
   segment invalidSeg;
-  std::vector<voxel> vxlSpace;
+  std::unique_ptr<voxel[]> _vxlSpace;
+  std::span<voxel> vxlSpace;
+  std::unique_ptr<voxel[]> _vxlmap;
+  std::mdspan<voxel, std::dextents<size_t, 3>> vxlmap;
+  std::span<const uint8_t> binary_image_flat;
+  std::mdspan<const uint8_t, std::dextents<size_t, 3>> binary_image;
   std::vector<medialBall> ballSpace;
-  medialBall ToBeAssigned;
-  std::vector<std::vector<size_t>> iZ;
+  medialBall ToBeAssigned{0};
+  // std::vector<std::vector<size_t>> iZ;
+  gtl::flat_hash_map<std::array<int, 3>, voxel> voxelmap;
 
   float _minRp;
   double _clipROutx;

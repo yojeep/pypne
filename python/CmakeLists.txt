@@ -1,0 +1,17 @@
+set(pybind11_DIR ${CMAKE_SOURCE_DIR}/thirdparty/system/pybind11/share/cmake/pybind11)
+find_package(pybind11 REQUIRED)
+
+pybind11_add_module(pypne_cpp
+    ${CMAKE_SOURCE_DIR}/src/pnm/pnextract/pypne.cpp   # 绑定入口
+)
+
+target_link_libraries(pypne_cpp PRIVATE pypne_core)
+
+target_include_directories(pypne_cpp SYSTEM PRIVATE
+${CMAKE_SOURCE_DIR}/src/include
+${CMAKE_SOURCE_DIR}/thirdparty/system 
+${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel
+    # ${CMAKE_SOURCE_DIR}/thirdparty/system/pybind11/include
+)
+
+install(TARGETS pypne_cpp LIBRARY DESTINATION ${CMAKE_SOURCE_DIR}/pypne/libcpp)

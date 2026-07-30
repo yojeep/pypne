@@ -1,19 +1,24 @@
 
 #include "medialSurf.h"
-#include "edt.h"
+#include "ElementGNE.h"
+#include "blockNet.h"
+#include "edt_double.h"
 #include "globals.h"
 #include "inputData.h"
 #include "typses.h"
+#include <array>
 #include <atomic>
 #include <boost/sort/sort.hpp>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
+#include <memory>
 
 medialSurface::medialSurface(
     inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
-    : cg_(cfg), segs_(cfg.segs_), ToBeAssigned(0) {
+    : cg_(cfg), segs_(cfg.segs_) {
   setDefaults(
       -5.); // set _minRp to negative value if not provided by user, to be
             // re-assigned in calc_distmaps(),  to be synced with setDefaults()
@@ -110,6 +115,21 @@ void medialSurface::setDefaults(double avgR) {
             << std::endl;
 }
 
+template <typename T> union ndi_t {
+  T value;
+
+  // 关键：默认构造函数什么都不做
+  ndi_t() {}
+
+  // 允许显式构造
+  template <typename... Args>
+  ndi_t(Args &&...args) : value(static_cast<Args &&>(args)...) {}
+
+  // 隐式转换成 T&
+  operator T &() { return value; }
+  T *operator->() { return &value; }
+};
+
 void medialSurface::buildvoxelspace() { ///  Build voxelspace -- memory for
                                         ///  void/active voxels
   std::cout << "\nProcessing " << cg_._rockTypes[0].name
@@ -117,38 +137,82 @@ void medialSurface::buildvoxelspace() { ///  Build voxelspace -- memory for
   std::cout << " Creating " << nVxls << " voxels with index: " << int(0);
   std::cout.flush();
 
-  vxlSpace.resize(nVxls);
+  _vxlmap = std::make_unique_for_overwrite<voxel[]>(nz * ny * nx);
+  vxlmap =
+      std::mdspan<voxel, std::dextents<size_t, 3>>(_vxlmap.get(), nz, ny, nx);
+  // vxlmap[1, 2, 3] = voxel(noInit);
 
-  std::vector<voxel>::iterator p = vxlSpace.begin();
-  const std::vector<voxel>::iterator vxlBegin = vxlSpace.begin();
-  iZ.resize(nz);
-  for (int iz = 0; iz < nz; ++iz) {
-    for (int iy = 0; iy < ny; ++iy) {
-      const segments &s = segs_[iz * ny + iy];
-      for (int ix = 0; ix < s.cnt; ++ix) {
-        if (s.s[ix].value == 0)
-          for (int i = s.s[ix].start; i < s.s[ix + 1].start; ++i) {
-            p->i = i;
-            p->j = iy;
-            p->k = iz;
-            size_t currentIndex = p - vxlBegin;
-            iZ[iz].push_back(currentIndex);
-            ++p;
-          }
-      }
+  _vxlSpace = std::make_unique_for_overwrite<voxel[]>(nVxls);
+  vxlSpace = std::span<voxel>(_vxlSpace.get(), nVxls);
+
+  auto &pool = GlobalThreadPool::get();
+  IndexUnraveler unraveler({
+      static_cast<size_t>(nz),
+      static_cast<size_t>(ny),
+      static_cast<size_t>(nx),
+  });
+  size_t total_iterations = nz * ny * nx;
+
+  binary_image_flat =
+      std::span<const uint8_t>(cg_.VImage.data_.data(), nz * ny * nx);
+  binary_image = std::mdspan<const uint8_t, std::dextents<size_t, 3>>(
+      cg_.VImage.data_.data(), nz, ny, nx);
+  pool.detach_blocks(0, total_iterations,
+                     [&](size_t start_idx, size_t end_idx) {
+                       auto coords = std::array<int, 3>{};
+                       for (size_t idx = start_idx; idx < end_idx; ++idx) {
+                         unraveler.unravel(idx, coords);
+                         size_t z = coords[0], y = coords[1], x = coords[2];
+                         if (binary_image_flat[idx] == 0) {
+                           voxel &vi = vxlmap[z, y, x];
+                           vi.i = x;
+                           vi.j = y;
+                           vi.k = z;
+                         } else {
+                           vxlmap[z, y, x] = voxel();
+                         }
+                       }
+                     });
+  pool.wait();
+
+  auto coords = std::array<int, 3>{};
+  size_t count = 0;
+  for (size_t idx = 0; idx < total_iterations; ++idx) {
+    if (binary_image_flat[idx] == 0) {
+      unraveler.unravel(idx, coords);
+      size_t z = coords[0], y = coords[1], x = coords[2];
+      voxel &vi = vxlSpace[count];
+      vi.i = x;
+      vi.j = y;
+      vi.k = z;
+      ++count;
     }
   }
 
-  if (nVxls != size_t(p - vxlSpace.begin()))
-    std::cout << "\n Error created " << size_t(p - vxlSpace.begin())
-              << " voxels " << std::endl;
+  // iZ.resize(nz);
+  // for (int iz = 0; iz < nz; ++iz) {
+  //   for (int iy = 0; iy < ny; ++iy) {
+  //     const segments &s = segs_[iz * ny + iy];
+  //     for (int ix = 0; ix < s.cnt; ++ix) {
+  //       if (s.s[ix].value == 0)
+  //         for (int i = s.s[ix].start; i < s.s[ix + 1].start; ++i) {
+  //           p->i = i;
+  //           p->j = iy;
+  //           p->k = iz;
+  //           // size_t currentIndex = p - vxlBegin;
+  //           // iZ[iz].push_back(currentIndex);
+  //           ++p;
+  //         }
+  //     }
+  //   }
+  // }
 
   std::cout << std::endl;
 
   /// Link voxels to segments
-  p = vxlSpace.begin();
-  int total_iterations = nz * ny;
-  for (int izy = 0; izy < total_iterations; ++izy) {
+  auto p = vxlSpace.begin();
+  total_iterations = nz * ny;
+  for (size_t izy = 0; izy < total_iterations; ++izy) {
     segments &s = segs_[izy];
     for (int ix = 0; ix < s.cnt; ++ix)
       if (s.s[ix].value == 0) {
@@ -160,7 +224,7 @@ void medialSurface::buildvoxelspace() { ///  Build voxelspace -- memory for
 
 void medialSurface::paradox_pre_removeincludedballI() // to remove the included
                                                       // maximal bals
-{ /// Remove maximal-balls, leave one in each adjacent voxesl. This saves time
+{ /// Remove maximal-balls, leave one in each adjacent voxel. This saves time
   /// when sorting in paradoxremoveincludedballI()
   if (!nVxls) {
     return;
@@ -169,65 +233,46 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included
   std::cout.flush();
 
   auto &pool = GlobalThreadPool::get();
-  const int kk_steps = (nz + 1) / 2;
-  const int jj_steps = (ny + 1) / 2;
-  const int total_iterations = kk_steps * jj_steps;
-  std::atomic<uint64_t> ndel(0);
+  const size_t z_steps = (nz + 1) / 2;
+  const size_t y_steps = (ny + 1) / 2;
+  const size_t x_steps = (nx + 1) / 2;
+  const size_t total_iterations = z_steps * y_steps * x_steps;
+
+  IndexUnraveler unraveler({z_steps, y_steps, x_steps});
+
+  std::atomic<uint64_t> _nBalls(0);
   pool.detach_blocks(
       0, total_iterations, [&](const size_t start, const size_t end) {
-        int local_ndel = 0;
-        for (size_t iter = start; iter < end; ++iter) {
-          int kk_idx = iter / jj_steps;
-          int jj_idx = iter % jj_steps;
-          int kk = kk_idx * 2;
-          int jj = jj_idx * 2;
-          const segments &s = segs_[kk * ny + jj];
-          for (int ix = 0; ix < s.cnt; ++ix) {
-            if (s.s[ix].value == 0) {
-              int ii_start = s.s[ix].start;
-              int ii_end = s.s[ix + 1].start;
-              for (int ii = ii_start; ii < ii_end; ii += 2) {
-                voxel *adjacent[8] = {
-                    vxl(ii, jj, kk),         vxl(ii + 1, jj, kk),
-                    vxl(ii, jj + 1, kk),     vxl(ii + 1, jj + 1, kk),
-                    vxl(ii, jj, kk + 1),     vxl(ii + 1, jj, kk + 1),
-                    vxl(ii, jj + 1, kk + 1), vxl(ii + 1, jj + 1, kk + 1)};
+        std::array<int, 3> coord{};
+        for (size_t idx = start; idx < end; ++idx) {
+          unraveler.unravel(idx, coord);
+          int zo = coord[0] * 2, yo = coord[1] * 2, xo = coord[2] * 2;
+          float max_r = -1.0;
+          voxel *max_voxel = nullptr;
+          for (short zi = 0; zi < 2; ++zi)
+            for (short yi = 0; yi < 2; ++yi)
+              for (short xi = 0; xi < 2; ++xi) {
+                int z = zo + zi, y = yo + yi, x = xo + xi;
+                if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
+                    binary_image[z, y, x] != 0)
+                  continue;
+                voxel *v = vxl(x, y, z);
 
-                // 查找 R 最大的体素
-                voxel *max_voxel = nullptr;
-                float max_R = 0.0f;
-                for (int c = 0; c < 8; ++c) {
-                  voxel *adj = adjacent[c];
-                  if (adj != nullptr && adj->ball != nullptr &&
-                      adj->R > max_R) {
-                    max_voxel = adj;
-                    max_R = adj->R;
-                  }
-                }
-
-                // 清除非最大体素的 ball 指针
-                if (max_voxel != nullptr) {
-                  for (int c = 0; c < 8; ++c) {
-                    voxel *adj = adjacent[c];
-                    if (adj != nullptr && adj->ball != nullptr &&
-                        adj != max_voxel) {
-                      adj->ball = nullptr;
-                      ++local_ndel;
-                    }
-                  }
+                float v_r = v->R;
+                if (v_r > max_r && v_r > _minRp) {
+                  max_r = v_r;
+                  max_voxel = v;
                 }
               }
-            }
+          if (max_voxel != nullptr) {
+            max_voxel->ball = &ToBeAssigned;
+            _nBalls.fetch_add(1, std::memory_order_relaxed);
           }
         }
-        ndel.fetch_add(local_ndel, std::memory_order_relaxed);
       });
 
   pool.wait();
-  ndel = ndel.load();
-  nBalls -= ndel;
-  std::cout << ",   removed = " << ndel << " remained = " << nBalls
-            << std::endl;
+  nBalls = _nBalls.load();
 }
 
 void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
@@ -246,53 +291,47 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
     }
   }
   std::cout << tvs.size() << " balls" << std::endl;
-  // sort(tvs.begin(), tvs.end(), metaballcomparer());
-  // sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-  // 	 { return a->R > b->R; });
   boost::sort::sample_sort(
       tvs.begin(), tvs.end(),
       [](const voxel *a, const voxel *b) { return a->R > b->R; }, num_workers);
 
   std::cout << " remove included balls:";
   std::cout.flush();
+  auto &binary_image = cg_.VImage.data_;
 
   size_t ndel = 0;
-  std::vector<voxel *>::iterator vpp = tvs.begin(), end = tvs.end();
-  while (vpp < end) {
-
-    voxel *vi = *vpp;
-    if (!vi->ball) {
-      ++vpp;
+  for (size_t idx = 0; idx < tvs.size(); ++idx) {
+    voxel *vi = tvs[idx];
+    if (!vi->ball)
       continue;
-    }
 
-    const int x = vi->i;
-    const int y = vi->j;
-    const int z = vi->k;
-    const float ri = vi->R;
-    const float ripinc = ri + 0.55; //.+RPreDelete
-    const float mbmbDist = _RCorsnf * ri + _RCorsn;
-    const float ripincsqr = ripinc * ripinc;
-    int ex, ey, ez;
-    ex = ripinc;
-    for (int a = -ex; a <= ex; ++a) {
-      const float asqr = a * a;
-      float arg_ey = ripincsqr - asqr;
-      if (arg_ey < 0)
+    int zo = vi->k, yo = vi->j, xo = vi->i;
+    float ri = vi->R;
+    float ripinc = ri + 0.55; //.+RPreDelete
+    float mbmbDist = _RCorsnf * ri + _RCorsn;
+    float ripinc2 = ripinc * ripinc;
+    int rz = ripinc;
+
+    for (int zi = -rz; zi < rz + 1; ++zi) {
+      float ry2 = ripinc2 - zi * zi;
+      if (ry2 <= 0)
         continue;
-      ey = std::sqrtf(arg_ey);
-      for (int b = -ey; b <= ey; ++b) {
-        const float bsqr = b * b;
-        float arg_ez = ripincsqr - asqr - bsqr;
-        if (arg_ez < 0)
+      int ry = std::sqrtf(ry2);
+      for (int yi = -ry; yi < ry + 1; ++yi) {
+        float rx2 = ry2 - yi * yi;
+        if (rx2 <= 0)
           continue;
-        ez = std::sqrtf(arg_ez); // sqrts(r2i)+1-a-b;
-        for (int c = -ez; c <= ez; ++c) {
-          voxel *vj = vxl(x + a, y + b, z + c);
-          if ((vj != nullptr) && (vj->ball) && (vj != vi)) {
-            const float rj = vj->R;
+        int rx = std::sqrtf(rx2); // sqrts(r2i)+1-a-b;
+        for (int xi = -rx; xi < rx + 1; ++xi) {
+          int z = zo + zi, y = yo + yi, x = xo + xi;
+          if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
+              binary_image[z * ny * nx + y * nx + x] != 0)
+            continue;
+          voxel *vj = vxl(x, y, z);
+          if ((vj->ball) && (vi != vj)) {
+            float rj = vj->R;
             if (rj <= ri) {
-              const float D = std::sqrtf(asqr + bsqr + c * c);
+              float D = std::sqrtf(zi * zi + yi * yi + xi * xi);
               if (D < mbmbDist || (D + rj < ripinc + _MSNoise)) {
                 vj->ball = nullptr;
                 ++ndel;
@@ -303,8 +342,7 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
       }
     }
 
-    ++vpp;
-    if ((vpp - tvs.begin()) % 10000 == 0)
+    if ((idx % 10000) == 0)
       std::cout << "\r  remove = " << ndel;
   }
   std::cout << "\r  removed = " << ndel << " remained = " << tvs.size() - ndel
@@ -348,11 +386,12 @@ void medialSurface::moveUphill(medialBall *b_i) // const
         disp.z = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
-  if (b_i != b_i->boss) {
-    dbl3 BosKidVec = *b_i - *(b_i->boss);
-    disp -=
-        0.95 * ((BosKidVec & disp) / (magSqr(BosKidVec) + 1e-12)) * BosKidVec;
-  }
+  // if (b_i != b_i->boss) {
+  //   dbl3 BosKidVec = *b_i - *(b_i->boss);
+  //   disp -=
+  //       0.95 * ((BosKidVec & disp) / (magSqr(BosKidVec) + 1e-12)) *
+  //       BosKidVec;
+  // }
   b_i->fi = vi->i - _mp5 + disp.x;
   b_i->fj = vi->j - _mp5 + disp.y;
   b_i->fk = vi->k - _mp5 + disp.z;
@@ -401,11 +440,11 @@ void medialSurface::moveUphillp1(medialBall *bi) // const
   }
   disp += 1.4 * grad;
 
-  if (bi != bi->boss) {
-    dbl3 BosKidVec = *bi - *(bi->boss);
-    disp -=
-        0.5 * ((BosKidVec & disp) / (magSqr(BosKidVec) + 1e-12)) * BosKidVec;
-  }
+  // if (bi != bi->boss) {
+  //   dbl3 BosKidVec = *bi - *(bi->boss);
+  //   disp -=
+  //       0.5 * ((BosKidVec & disp) / (magSqr(BosKidVec) + 1e-12)) * BosKidVec;
+  // }
   disp /= (0.55 * mag(disp) + 0.05);
 
   voxel *vxlj = vxl(bi->fi + disp[0], bi->fj + disp[1], bi->fk + disp[2]);
@@ -600,29 +639,31 @@ void medialSurface::competeForParent(medialBall *vi, medialBall *vj) {
 
 void medialSurface::findBoss(medialBall *vi) {
 
-  const float x = vi->fi, y = vi->fj, z = vi->fk;
-  const float ripp = vi->R * 0.6 + 2. * _MSNoise + 2.;
-  const float ex = x + ripp;
-  const float ripp2 = ripp * ripp;
-  for (float xpa = 2.f * x - ex; xpa <= ex; xpa += 1.0f) {
-    float xpa2 = (xpa - x) * (xpa - x);
-    const float remain_y = ripp2 - xpa2;
-    if (remain_y <= 0.f)
+  float zo = vi->fk, yo = vi->fj, xo = vi->fi;
+  float ripp = vi->R * 0.6 + 2. * _MSNoise + 2.;
+  float ripp2 = ripp * ripp;
+  auto &binary_image = cg_.VImage.data_;
+  float rz = ripp;
+  for (float zi = -rz; zi < rz + 1e-6f; zi += 1.f) {
+    float ry2 = ripp2 - zi * zi;
+    if (ry2 <= 0)
       continue;
-    float ey = y + sqrtf(remain_y);
-    for (float ypb = 2.f * y - ey; ypb <= ey; ypb += 1.0f) {
-      float ypb2 = (ypb - y) * (ypb - y);
-      float remain_z = remain_y - ypb2;
-      if (remain_z <= 0.f)
+    float ry = std::sqrtf(ry2);
+    for (float yi = -ry; yi < ry + 1e-6f; yi += 1.0f) {
+      float rx2 = ry2 - yi * yi;
+      if (rx2 <= 0)
         continue;
-      float ez = z + sqrtf(remain_z);
-      for (float zpc = 2.f * z - ez; zpc <= ez; zpc += 1.0f) {
-        voxel *vj = this->vxl(xpa, ypb, zpc);
-        if ((vj != nullptr) && vj->ball &&
-            (vi !=
-             vj->ball)) { //--------------------------------------------------------
+      float rx = std::sqrtf(rx2);
+      for (float xi = -rx; xi < rx + 1e-6f; xi += 1.0f) {
+        int z = zo + zi, y = yo + yi, x = xo + xi;
+        if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
+            binary_image[z * ny * nx + y * nx + x] != 0)
+          continue;
+        voxel *vj = vxl(x, y, z);
+
+        if (vj->ball && (vi != vj->ball)) {
           competeForParent(vi, vj->ball);
-        } //--------------------------------------------------------
+        }
       }
     }
   }
@@ -660,15 +701,14 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 
   if (!nVxls) {
     std::cout << " no voxels no balls,\n" << std::endl;
-    return;
+    exit(1);
   }
 
-  voxelImage vxls = segToVxlMesh(*this);
-
   auto &pool = GlobalThreadPool::get();
-  uint64_t nvoxels = vxls.size();
+  auto &binary_image = cg_.VImage.data_;
+  size_t nvoxels = binary_image.size();
 
-  auto src = vxls.data_.data();
+  auto src = binary_image.data();
   auto inv_labels = std::make_unique_for_overwrite<bool[]>(nvoxels);
   pool.detach_blocks(0, nvoxels,
                      [&](const size_t start_idx, const size_t end_idx) {
@@ -679,10 +719,10 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
 
   auto dt2 = std::make_unique_for_overwrite<float[]>(nvoxels);
 
-  edt::binary_edtsq<bool>(inv_labels.get(), static_cast<int64_t>(vxls.nx()),
-                          static_cast<int64_t>(vxls.ny()),
-                          static_cast<int64_t>(vxls.nz()), 1.0f, 1.0f, 1.0f,
-                          false, num_workers, dt2.get());
+  edt::binary_edtsq<bool>(inv_labels.get(), static_cast<int64_t>(cg_.nx),
+                          static_cast<int64_t>(cg_.ny),
+                          static_cast<int64_t>(cg_.nz), 1.0f, 1.0f, 1.0f, false,
+                          num_workers, dt2.get());
 
   const double clipROutyz = _clipROutyz;
   const double clipROutx = _clipROutx;
@@ -693,8 +733,8 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
       0, nVxls, [&](const size_t start_idx, const size_t end_idx) {
         double local_R = 0.0;
         for (size_t idx = start_idx; idx < end_idx; ++idx) {
-          voxel &vit = vxlSpace[idx];
-          const int x = vit.i, y = vit.j, z = vit.k;
+          voxel &vi = vxlSpace[idx];
+          const int z = vi.k, y = vi.j, x = vi.i;
 
           double limit =
               static_cast<double>(std::sqrt(dt2[z * ny * nx + y * nx + x])) -
@@ -717,7 +757,7 @@ void medialSurface::calc_distmaps() // search  MBs at each voxel
           if (iSqr < limit)
             limit = std::max((1.0 - clipROutx) * limit + clipROutx * iSqr, 0.1);
 
-          vit.R = limit;
+          vi.R = limit;
           local_R += limit;
         }
         totalR.fetch_add(local_R, std::memory_order_relaxed);
@@ -739,123 +779,83 @@ void medialSurface::smoothRadius() {
 
   (std::cout << " smoothing R  ").flush();
 
-  std::vector<float> delRrr(vxlSpace.size(), 0.0f);
+  // std::vector<float> delRrr(vxlSpace.size(), 0.0f);
   (std::cout << "*").flush();
-
+  const auto &binary_image = cg_.VImage.data_;
   auto &pool = GlobalThreadPool::get();
-  const size_t total_tasks = nz * ny;
-  pool.detach_blocks(0, total_tasks, [&](const size_t start, const size_t end) {
-    for (size_t iter = start; iter < end; ++iter) {
-      int k = iter / ny;
-      int j = iter % ny;
-      const segments &s = cg_.segs_[iter];
-      for (int ix = 0; ix < s.cnt; ++ix)
-        if (s.s[ix].value == 0) {
-          segment &seg = s.s[ix];
-          for (int i = seg.start; i < s.s[ix + 1].start; ++i) {
-            double sumR = 0.;
-            int counter = 0;
-            for (int kk = std::max(k - 1, 0); kk < std::min(k + 2, nz); ++kk)
-              for (int jj = std::max(j - 1, 0); jj < std::min(j + 2, ny);
-                   ++jj) {
-                int ii = std::max(i - 1, 0);
-                const segment *segbc = cg_.segptr(ii, jj, kk);
-                if (segbc->value != 0 && (segbc + 1)->value == 0) {
-                  ++segbc;
-                  ii = segbc->start;
-                }
-                if (segbc->value == 0) {
-                  int ii2 = std::min((segbc + 1)->start, i + 2);
-                  voxel *vxlj = segbc->segV + (ii - segbc->start);
-                  for (; ii < ii2; ++ii) {
-                    sumR += vxlj->R;
-                    ++vxlj;
-                    counter += 1;
-                  }
-                }
-              }
+  const size_t total_iterations = nVxls;
+  size_t nvoxels = binary_image.size();
+  auto delRrr = std::make_unique_for_overwrite<float[]>(nvoxels);
 
-            delRrr[seg.segV + (i - seg.start) - (&vxlSpace[0])] =
-                4. * sumR / (3 * counter + 27) - seg.segV[i - seg.start].R;
-          }
+  pool.detach_blocks(
+      0, total_iterations, [&](const size_t start_idx, const size_t end_idx) {
+        for (size_t idx = start_idx; idx < end_idx; ++idx) {
+          voxel &vi = vxlSpace[idx];
+          const int zo = vi.k, yo = vi.j, xo = vi.i;
+          double sumR{0.};
+          size_t counter{0};
+          for (short zi = -1; zi < 2; ++zi)
+            for (short yi = -1; yi < 2; ++yi)
+              for (short xi = -1; xi < 2; ++xi) {
+                int z = zo + zi, y = yo + yi, x = xo + xi;
+                if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
+                    binary_image[z * ny * nx + y * nx + x] != 0)
+                  continue;
+                sumR += vxl(x, y, z)->R;
+                ++counter;
+              }
+          delRrr[zo * ny * nx + yo * nx + xo] =
+              4. * sumR / (3 * counter + 27) - vi.R;
         }
-    }
-  });
+      });
   pool.wait();
   (std::cout << "*").flush();
 
-  pool.detach_blocks(0, total_tasks, [&](const size_t start, const size_t end) {
-    for (size_t iter = start; iter < end; ++iter) {
-      int k = iter / ny;
-      int j = iter % ny;
-      const segments &s = cg_.segs_[iter];
-      for (int ix = 0; ix < s.cnt; ++ix)
-        if (s.s[ix].value == 0) {
-          segment &seg = s.s[ix];
-          for (int i = seg.start; i < s.s[ix + 1].start; ++i) {
-            double sumDelR = 0.;
-            int counter = 0;
-            for (int kk = std::max(k - 1, 0); kk < std::min(k + 2, nz); ++kk)
-              for (int jj = std::max(j - 1, 0); jj < std::min(j + 2, ny);
-                   ++jj) {
-                int ii = std::max(i - 1, 0);
-                const segment *segbc = cg_.segptr(ii, jj, kk);
-                if (segbc->value != 0 && (segbc + 1)->value == 0) {
-                  ++segbc;
-                  ii = segbc->start;
-                }
-                if (segbc->value == 0) {
-                  int ii2 = std::min((segbc + 1)->start, i + 2);
-                  voxel *vxlj = segbc->segV + (ii - segbc->start);
-                  for (; ii < ii2; ++ii) {
-                    sumDelR += delRrr[vxlj - (&vxlSpace[0])];
-                    ++vxlj;
-                    ++counter;
-                  }
-                }
-              }
+  pool.detach_blocks(
+      0, total_iterations, [&](const size_t start_idx, const size_t end_idx) {
+        for (size_t idx = start_idx; idx < end_idx; ++idx) {
 
-            seg.segV[i - seg.start].R += std::min(
-                std::max(
-                    0.02 *
-                        (delRrr[seg.segV + (i - seg.start) - (&vxlSpace[0])] -
-                         0.99 * 2. * sumDelR / (1 * counter + 27)),
-                    -0.005),
-                0.01);
-          }
+          voxel &vi = vxlSpace[idx];
+          const int zo = vi.k, yo = vi.j, xo = vi.i;
+          double sumDelR{0.};
+          size_t counter{0};
+          for (short zi = -1; zi < 2; ++zi)
+            for (short yi = -1; yi < 2; ++yi)
+              for (short xi = -1; xi < 2; ++xi) {
+                int z = zo + zi, y = yo + yi, x = xo + xi;
+                if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
+                    binary_image[z * ny * nx + y * nx + x] != 0)
+                  continue;
+                sumDelR += delRrr[z * ny * nx + y * nx + x];
+                ++counter;
+              }
+          vi.R +=
+              std::min(std::max(0.02 * (delRrr[zo * ny * nx + yo * nx + xo] -
+                                        0.99 * 2. * sumDelR / (counter + 27)),
+                                -0.005),
+                       0.01);
         }
-    }
-  });
+      });
   pool.wait();
   (std::cout << "*").flush();
 
   /// Finally, report max distance map, to confirm that distance map is not
   /// changed too much
-  float maxrrr = 0.0f;
-  const size_t total = vxlSpace.size();
-  if (total == 0) {
-    std::cout << " maxrrr 0." << std::endl;
-    return;
-  }
-  auto maxrrr_future = pool.submit_blocks(
-      0, total, [&](const size_t start, const size_t end) -> float {
-        float local_max = 0.0f;
-        for (size_t i = start; i < end; ++i) {
-          local_max = std::max(local_max, vxlSpace[i].R);
-        }
-        return local_max;
-      });
-  // 等待所有任务完成，并合并结果
-  for (auto &future : maxrrr_future) {
-    maxrrr = std::max(maxrrr, future.get());
-  }
+  // float maxrrr = 0.0f;
+  // for (size_t i = 0; i < vxlSpace.size(); ++i)
+  //   maxrrr = std::max(maxrrr, vxlSpace[i].R);
+
+  auto it =
+      std::max_element(vxlSpace.begin(), vxlSpace.end(),
+                       [](const auto &a, const auto &b) { return a.R < b.R; });
+  float maxrrr = (it != vxlSpace.end()) ? it->R : 0.0f;
+
   std::cout << " maxrrr " << maxrrr << std::endl;
 }
 
 void medialSurface::
     createBallsAndHierarchy() { /// Create distance map, maximal-spheres, and
                                 /// their hirarchy (medial-surface connectivity)
-
   //	mediaAxes medAxis(*this, minRP, clipOutSideBallFraction,
   // clipOutSideBallFraction*0.5+0.);
 
@@ -866,36 +866,14 @@ void medialSurface::
   for (int i = 0; i < _nRSmoothing; ++i)
     smoothRadius();
 
-  std::atomic<size_t> _nBalls(0);
-  std::atomic<double> rBalls(0.0);
+  // std::atomic<size_t> _nBalls(0);
+  // std::atomic<double> rBalls(0.0);
 
   auto &pool = GlobalThreadPool::get();
-  const size_t total_iterations = vxlSpace.size();
-  pool.detach_blocks(0, total_iterations,
-                     [&](const size_t start, const size_t end) {
-                       size_t local_nBalls = 0;
-                       double local_rBalls = 0.0;
-
-                       for (size_t i = start; i < end; ++i) {
-                         voxel &v = vxlSpace[i];
-                         if (v.R >= _minRp) {
-                           v.ball = &ToBeAssigned;
-                           ++local_nBalls;
-                           local_rBalls += v.R;
-                         } else {
-                           v.ball = nullptr;
-                         }
-                       }
-                       _nBalls.fetch_add(local_nBalls);
-                       rBalls.fetch_add(local_rBalls);
-                     });
-  pool.wait();
-  nBalls = _nBalls.load();
-
-  std::cout << "\n  number of potential maximal spheres: " << nBalls
-            << ",  average radius = " << rBalls.load() / nBalls << std::endl;
 
   paradox_pre_removeincludedballI();
+  std::cout << "\n  number of potential maximal spheres: " << nBalls
+            << std::endl;
 
   paradoxremoveincludedballI();
 
@@ -903,21 +881,17 @@ void medialSurface::
 
   std::vector<voxel *> tvs;
   tvs.reserve(nBalls);
-  {
-    for (voxel &v : vxlSpace) {
-      if (v.ball) {
-        tvs.push_back(&v);
-      }
+
+  for (voxel &v : vxlSpace) {
+    if (v.ball) {
+      tvs.push_back(&v);
     }
-    // sort(tvs.begin(), tvs.end(), [](const voxel *a, const voxel *b)
-    // 	 { return a->R > b->R; });
-    boost::sort::sample_sort(
-        tvs.begin(), tvs.end(),
-        [](const voxel *a, const voxel *b) { return a->R > b->R; },
-        num_workers);
-    std::cout << " sorting " << int(tvs.size()) << " maximal balls"
-              << std::endl;
   }
+
+  boost::sort::sample_sort(
+      tvs.begin(), tvs.end(),
+      [](const voxel *a, const voxel *b) { return a->R > b->R; }, num_workers);
+  std::cout << " sorting " << int(tvs.size()) << " maximal balls" << std::endl;
 
   ballSpace.reserve(nBalls);
   for (voxel *v : tvs) {

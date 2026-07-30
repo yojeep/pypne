@@ -18,4 +18,4 @@ image_VElems, pn = pypne.pnextract(
 )
 
 image = image_VElems[1:-1, 1:-1, 1:-1]
-tifffile.imwrite("./image_VElems_temp.tif", image)
+# tifffile.imwrite("./image_VElems_temp.tif", image)

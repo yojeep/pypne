@@ -4,25 +4,28 @@
 #include "typses.h"
 #include <map>
 #include <iostream>
-#include <array>
-const static int LEVEL_MAX = 32767;
+
+// const static int LEVEL_MAX = 32767;
 inline int nAprox(1);
 inline float _mp5(-0.5);
 class medialBall;
+
+
 class voxel
 {
 public:
-	voxel(short ii, short jj, short kk, float rR) : ball(nullptr), i(ii), j(jj), k(kk), R(rR) {};
-	voxel() : ball(nullptr), i(-1), j(-1), k(-1), R(0) {};
-
+	voxel(int ii, int jj, int kk, float rR) :  i(ii), j(jj), k(kk), R(rR), ball(nullptr) {};
+	voxel() :i(SIZE_MAX), j(SIZE_MAX), k(SIZE_MAX), R(0),ball(nullptr) {};
 public:
-	medialBall *ball;
-	short i, j, k;
+	int i, j, k;
 	float R;
+	medialBall *ball;
+	
+
 };
 
 // class vxlface
-//{
+// {
 // public:
 // vxlface(short i, short j, short k, char dirr ) :  _ijk({{i,j,k}}),dir(dirr) {};//,hasBall(false)
 // vxlface() : _ijk({{-1,-1,-1}}),dir(0) {};
@@ -31,7 +34,7 @@ public:
 // private:
 // array<short,3> _ijk;
 // char dir;
-//};
+// };
 
 class segment
 {

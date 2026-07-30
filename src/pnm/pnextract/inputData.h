@@ -6,6 +6,7 @@
 #include "ElementGNE.h"
 
 
+
 #ifndef PORORANGE_H
 #define PORORANGE_H
 class poroRange : public std::pair<unsigned char, unsigned char>
@@ -319,6 +320,7 @@ public:
 	stvec<int> segValues;
 	stvec<poroRange> _rockTypes;
 	voxelImage VImage;
+
 };
 
 #endif

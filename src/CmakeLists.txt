@@ -1,0 +1,35 @@
+add_library(voxel STATIC
+    ${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel/voxelImage.cpp
+)
+target_include_directories(voxel PUBLIC
+    ${CMAKE_SOURCE_DIR}/thirdparty/system
+    ${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel
+    
+)
+target_include_directories(voxel PUBLIC
+    ${CMAKE_SOURCE_DIR}/src/include
+    ${CMAKE_SOURCE_DIR}/thirdparty/system
+)
+
+add_library(pypne_core STATIC
+    pnm/pnextract/blockNet.cpp
+    pnm/pnextract/medialSurf.cpp
+    pnm/pnextract/writers_vtk.cpp
+    pnm/pnextract/writers_vxl.cpp
+)
+
+target_include_directories(pypne_core
+    PUBLIC  ${CMAKE_SOURCE_DIR}/src/include
+    PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system
+    PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel
+)
+
+target_link_libraries(pypne_core PUBLIC voxel)
+target_compile_definitions(pypne_core PRIVATE BOOST_DISABLE_ASSERTS)
+
+
+if(MSVC)
+    target_compile_options(pypne_core PRIVATE /O2 /W1 /GL /LTCG /MT)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(pypne_core PRIVATE -O3 -Wall)
+endif()

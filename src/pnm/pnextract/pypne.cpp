@@ -49,7 +49,7 @@ auto genextraction(const int nx, const int ny, const int nz,
                                 buf.size * buf.itemsize);
 
   voxelImageT_PYPNE<uint8_t> vm;
-  vm.setData(data);
+  vm.setData(data); // data to moved to vm, do not use data after this line
   vm.setNnn(int3(nx, ny, nz));
   vm.setNij(nx * ny);
   std::string output_path = "pn";
@@ -57,7 +57,9 @@ auto genextraction(const int nx, const int ny, const int nz,
     output_path = config_dict["output_path"].cast<std::string>();
   };
 
-  auto cfg = inputDataNE_PYPNE(nx, ny, nz, resolution, vm, output_path);
+  auto cfg = inputDataNE_PYPNE(
+      nx, ny, nz, resolution, vm,
+      output_path); // vm is moved to cfg， do not use vm after this line
   vec_str_pair cfg_data = convert_dict(config_dict);
   cfg.setData(cfg_data);
   cfg.createSegments();

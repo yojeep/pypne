@@ -15,6 +15,7 @@ Ali Q Raeini: a.q.raeini@imperial.ac.uk
 #ifndef voxelImageT_H
 #define voxelImageT_H
 
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <string.h>
@@ -27,7 +28,6 @@ Ali Q Raeini: a.q.raeini@imperial.ac.uk
 #include <numeric>
 #include <unordered_map>
 #include <functional>
-
 #include "typses.h"
 #ifdef _STOR_PUB
 #include "SiR.h" //_STOR
@@ -361,7 +361,7 @@ voxelImageT<T> copyOrReadImgT(std::string hdrNam)
 #define _dbgetOrReadImgT(_img, _hdrNam) voxelImageT<T> _img(_hdrNam)
 #endif
 
-typedef voxelImageT<unsigned char> voxelImage; //! default image format
+typedef voxelImageT<uint8_t> voxelImage; //! default image format
 
 #include "voxelImageI.h"
 

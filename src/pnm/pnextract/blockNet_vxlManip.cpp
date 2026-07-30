@@ -156,10 +156,7 @@ size_t growPoresGeneric(const inputDataNE &cg, voxelField<int> &VElems,
 
         for (size_t idx = start_idx; idx < end_idx; ++idx) {
           unraveler.unravel(idx, coords);
-          const int k = static_cast<int>(coords[0]);
-          const int j = static_cast<int>(coords[1]);
-
-          // 边界守卫：保证6个方向 ±1 均不越界
+          const int k = coords[0], j = coords[1];
           if (k == 0 || k == nz - 1 || j == 0 || j == ny - 1)
             continue;
 
@@ -298,12 +295,12 @@ void retreatPoresMedian(const inputDataNE &cg, voxelField<int> &VElems,
                 }
               };
 
-              visit_neighbor(voxls.v_i(1, pijk));
               visit_neighbor(voxls.v_i(-1, pijk));
-              visit_neighbor(voxls.v_j(1, pijk));
+              visit_neighbor(voxls.v_i(1, pijk));
               visit_neighbor(voxls.v_j(-1, pijk));
-              visit_neighbor(voxls.v_k(1, pijk));
+              visit_neighbor(voxls.v_j(1, pijk));
               visit_neighbor(voxls.v_k(-1, pijk));
+              visit_neighbor(voxls.v_k(1, pijk));
 
               if (nDifferentID > 0 && nSameID > 0) {
                 VElems(i, j, k) = unassigned;
