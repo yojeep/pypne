@@ -1,6 +1,5 @@
 #include "Eigen/CXX11/Tensor"
 #include "ElementGNE.h"
-#include "indexunraveler.hpp"
 #include "inputData.h"
 #include "voxelImage.h"
 #include <cstddef>
