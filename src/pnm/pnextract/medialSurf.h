@@ -1,4 +1,5 @@
 #pragma once
+#include "Eigen/CXX11/Tensor"
 #include "inputData.h"
 #include "typses.h"
 #include "voxelmap.h"
@@ -98,12 +99,13 @@ public:
 
   std::vector<segments> &segs_;
   segment invalidSeg;
-  std::unique_ptr<voxel[]> _vxlSpace;
-  std::span<voxel> vxlSpace;
-  std::unique_ptr<voxel[]> _vxlmap;
-  std::mdspan<voxel, std::dextents<size_t, 3>> vxlmap;
-  std::span<const uint8_t> binary_image_flat;
-  std::mdspan<const uint8_t, std::dextents<size_t, 3>> binary_image;
+  std::vector<voxel> vxlSpace;
+  Eigen::Tensor<voxel*, 3, Eigen::RowMajor> vxlMap;
+  Eigen::TensorMap<Eigen::Tensor<uint8_t, 3, Eigen::RowMajor>>
+      binary_image;
+  Eigen::TensorMap<Eigen::Tensor<uint8_t, 1, Eigen::RowMajor>>
+      binary_image_flat;
+
   std::vector<medialBall> ballSpace;
   medialBall ToBeAssigned{0};
   // std::vector<std::vector<size_t>> iZ;

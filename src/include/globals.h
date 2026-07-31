@@ -8,6 +8,7 @@
 #include <filesystem> // Include the standard filesystem header
 #include <thread_pool/BS_thread_pool.hpp>
 #include <memory>
+#include <Eigen/CXX11/Tensor>
 inline int num_workers(1);
 #pragma once
 class GlobalThreadPool

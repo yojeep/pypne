@@ -1,5 +1,10 @@
 add_executable(test_pypne test.cpp)
-target_include_directories(test_pypne PUBLIC ${CMAKE_SOURCE_DIR}/src/pnm/pnextract PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty/system)
+target_include_directories(test_pypne
+PUBLIC ${CMAKE_SOURCE_DIR}/src/pnm/pnextract
+PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty/system
+PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1
+PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1/unsupported
+)
 
 
 add_compile_options(-O3)

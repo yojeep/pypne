@@ -1,11 +1,12 @@
 
 #include "medialSurf.h"
 #include "ElementGNE.h"
-#include "blockNet.h"
 #include "edt_double.h"
 #include "globals.h"
 #include "inputData.h"
-#include "typses.h"
+// #include "typses.h"
+#include "indexunraveler.hpp"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <boost/sort/sort.hpp>
@@ -18,7 +19,9 @@
 
 medialSurface::medialSurface(
     inputDataNE &cfg) //, double vmvLimRelF, double crossAreaf
-    : cg_(cfg), segs_(cfg.segs_) {
+    : cg_(cfg), segs_(cfg.segs_),
+      binary_image(cfg.VImage.data_.data(), cfg.nz, cfg.ny, cfg.nx),
+      binary_image_flat(cfg.VImage.data_.data(), cfg.nz * cfg.ny * cfg.nx) {
   setDefaults(
       -5.); // set _minRp to negative value if not provided by user, to be
             // re-assigned in calc_distmaps(),  to be synced with setDefaults()
@@ -136,16 +139,17 @@ void medialSurface::buildvoxelspace() { ///  Build voxelspace -- memory for
             << " voxels:" << std::endl;
   std::cout << " Creating " << nVxls << " voxels with index: " << int(0);
   std::cout.flush();
+  // binary_image_flat =
+  //     std::span<const uint8_t>(cg_.VImage.data_.data(), nz * ny * nx);
 
-  _vxlmap = std::make_unique_for_overwrite<voxel[]>(nz * ny * nx);
-  vxlmap =
-      std::mdspan<voxel, std::dextents<size_t, 3>>(_vxlmap.get(), nz, ny, nx);
-  // vxlmap[1, 2, 3] = voxel(noInit);
+  // binary_image = std::mdspan<const uint8_t, std::dextents<size_t, 3>>(
+  //     cg_.VImage.data_.data(), nz, ny, nx);
 
-  _vxlSpace = std::make_unique_for_overwrite<voxel[]>(nVxls);
-  vxlSpace = std::span<voxel>(_vxlSpace.get(), nVxls);
+  // vxlSpace = Eigen::array<voxel, 1>(int(nVxls));
 
-  auto &pool = GlobalThreadPool::get();
+  vxlSpace.reserve(nVxls);
+  vxlMap = Eigen::Tensor<voxel *, 3, Eigen::RowMajor>(nz, ny, nx);
+
   IndexUnraveler unraveler({
       static_cast<size_t>(nz),
       static_cast<size_t>(ny),
@@ -153,43 +157,24 @@ void medialSurface::buildvoxelspace() { ///  Build voxelspace -- memory for
   });
   size_t total_iterations = nz * ny * nx;
 
-  binary_image_flat =
-      std::span<const uint8_t>(cg_.VImage.data_.data(), nz * ny * nx);
-  binary_image = std::mdspan<const uint8_t, std::dextents<size_t, 3>>(
-      cg_.VImage.data_.data(), nz, ny, nx);
-  pool.detach_blocks(0, total_iterations,
-                     [&](size_t start_idx, size_t end_idx) {
-                       auto coords = std::array<int, 3>{};
-                       for (size_t idx = start_idx; idx < end_idx; ++idx) {
-                         unraveler.unravel(idx, coords);
-                         size_t z = coords[0], y = coords[1], x = coords[2];
-                         if (binary_image_flat[idx] == 0) {
-                           voxel &vi = vxlmap[z, y, x];
-                           vi.i = x;
-                           vi.j = y;
-                           vi.k = z;
-                         } else {
-                           vxlmap[z, y, x] = voxel();
-                         }
-                       }
-                     });
-  pool.wait();
-
   auto coords = std::array<int, 3>{};
   size_t count = 0;
   for (size_t idx = 0; idx < total_iterations; ++idx) {
-    if (binary_image_flat[idx] == 0) {
-      unraveler.unravel(idx, coords);
-      size_t z = coords[0], y = coords[1], x = coords[2];
+    unraveler.unravel(idx, coords);
+    int z = coords[0], y = coords[1], x = coords[2];
+    if (binary_image_flat(idx) == 0) {
+      vxlSpace.emplace_back(x, y, z, 0);
       voxel &vi = vxlSpace[count];
       vi.i = x;
       vi.j = y;
       vi.k = z;
+      vxlMap(z, y, x) = &vi;
       ++count;
+    } else {
+      vxlMap(z, y, x) = nullptr;
     }
   }
 
-  // iZ.resize(nz);
   // for (int iz = 0; iz < nz; ++iz) {
   //   for (int iy = 0; iy < ny; ++iy) {
   //     const segments &s = segs_[iz * ny + iy];
@@ -206,8 +191,6 @@ void medialSurface::buildvoxelspace() { ///  Build voxelspace -- memory for
   //     }
   //   }
   // }
-
-  std::cout << std::endl;
 
   /// Link voxels to segments
   auto p = vxlSpace.begin();
@@ -254,9 +237,9 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included
               for (short xi = 0; xi < 2; ++xi) {
                 int z = zo + zi, y = yo + yi, x = xo + xi;
                 if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
-                    binary_image[z, y, x] != 0)
+                    binary_image(z, y, x) != 0)
                   continue;
-                voxel *v = vxl(x, y, z);
+                voxel *v = vxlMap(z, y, x);
 
                 float v_r = v->R;
                 if (v_r > max_r && v_r > _minRp) {
@@ -285,11 +268,13 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
   std::cout << " sorting... ";
   std::vector<voxel *> tvs;
   tvs.reserve(nBalls);
+
   for (voxel &v : vxlSpace) {
     if (v.ball) {
       tvs.push_back(&v);
     }
   }
+
   std::cout << tvs.size() << " balls" << std::endl;
   boost::sort::sample_sort(
       tvs.begin(), tvs.end(),
@@ -297,7 +282,6 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
 
   std::cout << " remove included balls:";
   std::cout.flush();
-  auto &binary_image = cg_.VImage.data_;
 
   size_t ndel = 0;
   for (size_t idx = 0; idx < tvs.size(); ++idx) {
@@ -325,9 +309,9 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
         for (int xi = -rx; xi < rx + 1; ++xi) {
           int z = zo + zi, y = yo + yi, x = xo + xi;
           if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
-              binary_image[z * ny * nx + y * nx + x] != 0)
+              binary_image(z, y, x) != 0)
             continue;
-          voxel *vj = vxl(x, y, z);
+          voxel *vj = vxlMap(z, y, x);
           if ((vj->ball) && (vi != vj)) {
             float rj = vj->R;
             if (rj <= ri) {
@@ -354,131 +338,171 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
 void medialSurface::moveUphill(medialBall *b_i) // const
 { /// Refines the maximal-sphere location and radius,
 
-  const voxel *vi = vxl(b_i->fi, b_i->fj, b_i->fk);
-  dbl3 disp(0., 0., 0.);
-  {
-    const voxel *vjm = vxl(vi->i - 1, vi->j, vi->k);
-    const voxel *vjp = vxl(vi->i + 1, vi->j, vi->k);
-    if (vjm && vjp) {
+  const voxel *vi = vxlMap(b_i->iz(), b_i->iy(), b_i->ix());
+  const int zm = vi->k, ym = vi->j, xm = vi->i;
+  const int zn = zm - 1, zp = zm + 1, yn = ym - 1, yp = ym + 1, xn = xm - 1,
+            xp = xm + 1;
+  std::array<float, 3> disp{};
+  if (0 <= xn && xp < nx) {
+    const voxel *vjn = vxlMap(zm, ym, xn);
+    const voxel *vjp = vxlMap(zm, ym, xp);
+    if (vjn && vjp) {
       float gp = vjp->R - vi->R;
-      float gm = vi->R - vjm->R;
+      float gm = vi->R - vjn->R;
       if (std::abs(gp - gm) > 0.01)
-        disp.x = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
+        disp[0] = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
-  {
-    const voxel *vjm = vxl(vi->i, vi->j - 1, vi->k);
-    const voxel *vjp = vxl(vi->i, vi->j + 1, vi->k);
-    if (vjm && vjp) {
+  if (0 <= yn && yp < ny) {
+    const voxel *vjn = vxlMap(zm, yn, xm);
+    const voxel *vjp = vxlMap(zm, yp, xm);
+    if (vjn && vjp) {
       float gp = vjp->R - vi->R;
-      float gm = vi->R - vjm->R;
+      float gm = vi->R - vjn->R;
       if (std::abs(gp - gm) > 0.01)
-        disp.y = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
+        disp[1] = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
-  {
-    const voxel *vjm = vxl(vi->i, vi->j, vi->k - 1);
-    const voxel *vjp = vxl(vi->i, vi->j, vi->k + 1);
-    if (vjm && vjp) {
+  if (0 <= zn && zp < nz) {
+    const voxel *vjn = vxlMap(zn, ym, xm);
+    const voxel *vjp = vxlMap(zp, ym, xm);
+    if (vjn && vjp) {
       float gp = vjp->R - vi->R;
-      float gm = vi->R - vjm->R;
+      float gm = vi->R - vjn->R;
       if (std::abs(gp - gm) > 0.01)
-        disp.z = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
+        disp[2] = std::max(-0.49, std::min(0.49, -0.5 * (gp + gm) / (gp - gm)));
     }
   }
-  // if (b_i != b_i->boss) {
-  //   dbl3 BosKidVec = *b_i - *(b_i->boss);
-  //   disp -=
-  //       0.95 * ((BosKidVec & disp) / (magSqr(BosKidVec) + 1e-12)) *
-  //       BosKidVec;
-  // }
-  b_i->fi = vi->i - _mp5 + disp.x;
-  b_i->fj = vi->j - _mp5 + disp.y;
-  b_i->fk = vi->k - _mp5 + disp.z;
-  b_i->R = vi->R + 0.95 * mag(disp);
+  if (b_i != b_i->boss) {
+    std::array<float, 3> BosKidVec = {
+        b_i->fi - b_i->boss->fi, // x
+        b_i->fj - b_i->boss->fj, // y
+        b_i->fk - b_i->boss->fk  // z
+    };
+
+    float dot = BosKidVec[0] * disp[0] + BosKidVec[1] * disp[1] +
+                BosKidVec[2] * disp[2];
+
+    // magSqr(BosKidVec)
+    float magSq = BosKidVec[0] * BosKidVec[0] + BosKidVec[1] * BosKidVec[1] +
+                  BosKidVec[2] * BosKidVec[2];
+
+    // disp -= 0.95 * (dot / (magSq + 1e-12)) * BosKidVec
+    float coeff = 0.95 * dot / (magSq + 1e-12);
+    disp[0] -= coeff * BosKidVec[0];
+    disp[1] -= coeff * BosKidVec[1];
+    disp[2] -= coeff * BosKidVec[2];
+  }
+  b_i->fi = vi->i - _mp5 + disp[0];
+  b_i->fj = vi->j - _mp5 + disp[1];
+  b_i->fk = vi->k - _mp5 + disp[2];
+  b_i->R = vi->R + 0.95 * std::sqrtf(disp[0] * disp[0] + disp[1] * disp[1] +
+                                     disp[2] * disp[2]);
 }
 
 void medialSurface::moveUphillp1(medialBall *bi) // const
 { /// Refines the maximal-sphere location, by moving it uphil the gradient of
   /// the distance-map, potentially relocates to new voxels
 
-  const voxel *vi = vxl(bi->fi, bi->fj, bi->fk);
-  dbl3 disp(0., 0., 0.), grad(0., 0., 0.);
+  const voxel *vi = vxlMap(bi->iz(), bi->iy(), bi->ix());
+  const int zm = vi->k, ym = vi->j, xm = vi->i;
+  const int zn = zm - 1, zp = zm + 1, yn = ym - 1, yp = ym + 1, xn = xm - 1,
+            xp = xm + 1;
+  std::array<float, 3> disp{}, grad{};
 
-  {
-    const voxel *vjm = vxl(vi->i - 1, vi->j, vi->k);
-    const voxel *vjp = vxl(vi->i + 1, vi->j, vi->k);
-    if (vjm && vjp) {
-      float gp = vjp->R - vi->R;
-      float gm = vi->R - vjm->R;
-      grad.x = 0.5 * (gp + gm);
-      if (std::abs(gp - gm) > 0.01)
-        disp.x = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
+  if (0 <= xn && xp < nx) {
+    const voxel *vjm = vxlMap(zm, ym, xn);
+    const voxel *vjp = vxlMap(zm, ym, xp);
+    float gp = vjp->R - vi->R;
+    float gm = vi->R - vjm->R;
+    grad[0] = 0.5 * (gp + gm);
+    if (std::abs(gp - gm) > 0.01)
+      disp[0] = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
+  }
+
+  if (0 <= yn && yp < ny) {
+    const voxel *vjm = vxlMap(zm, yn, xm);
+    const voxel *vjp = vxlMap(zm, yp, xm);
+    float gp = vjp->R - vi->R;
+    float gm = vi->R - vjm->R;
+    grad[1] = 0.5 * (gp + gm);
+    if (std::abs(gp - gm) > 0.01)
+      disp[1] = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
+  }
+
+  if (0 <= zn && zp < nz) {
+    const voxel *vjm = vxlMap(zn, ym, xm);
+    const voxel *vjp = vxlMap(zp, ym, xm);
+    float gp = vjp->R - vi->R;
+    float gm = vi->R - vjm->R;
+    grad[2] = 0.5 * (gp + gm);
+    if (std::abs(gp - gm) > 0.01)
+      disp[2] = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
+  }
+
+  for (int d = 0; d < 3; ++d)
+    disp[d] += 1.4f * grad[d];
+
+  if (bi != bi->boss) {
+    std::array<float, 3> BosKidVec = {
+        bi->fi - bi->boss->fi, // x
+        bi->fj - bi->boss->fj, // y
+        bi->fk - bi->boss->fk  // z
+    };
+
+    float dot = BosKidVec[0] * disp[0] + BosKidVec[1] * disp[1] +
+                BosKidVec[2] * disp[2];
+
+    // magSqr(BosKidVec)
+    float magSq = BosKidVec[0] * BosKidVec[0] + BosKidVec[1] * BosKidVec[1] +
+                  BosKidVec[2] * BosKidVec[2];
+
+    // disp -= 0.95 * (dot / (magSq + 1e-12)) * BosKidVec
+    float coeff = 0.95 * dot / (magSq + 1e-12);
+    disp[0] -= coeff * BosKidVec[0];
+    disp[1] -= coeff * BosKidVec[1];
+    disp[2] -= coeff * BosKidVec[2];
+  }
+
+  float len = 0.0f;
+  for (int d = 0; d < 3; ++d)
+    len += disp[d] * disp[d];
+  float scale = 1.0f / (0.55f * std::sqrtf(len) + 0.05f);
+  for (int d = 0; d < 3; ++d)
+    disp[d] *= scale;
+
+  int iz_vj = bi->fk + disp[2], iy_vj = bi->fj + disp[1],
+      ix_vj = bi->fi + disp[0];
+  if (0 <= iz_vj && iz_vj < nz && 0 <= iy_vj && iy_vj < ny && 0 <= ix_vj &&
+      ix_vj < nx) {
+    voxel *vj = vxlMap(iz_vj, iy_vj, ix_vj);
+    if (vj && vi != vj && vj->R > vi->R && vj->ball == nullptr) {
+      bi->vxl->ball = nullptr;
+      bi->vxl = vj;
+      bi->fi = vj->i - _mp5;
+      bi->fj = vj->j - _mp5;
+      bi->fk = vj->k - _mp5;
+      bi->R = vj->R;
+      vj->ball = bi;
     }
   }
-  {
-    const voxel *vjm = vxl(vi->i, vi->j - 1, vi->k);
-    const voxel *vjp = vxl(vi->i, vi->j + 1, vi->k);
-    if (vjm && vjp) {
-      float gp = vjp->R - vi->R;
-      float gm = vi->R - vjm->R;
-      grad.y = 0.5 * (gp + gm);
-      if (std::abs(gp - gm) > 0.01)
-        disp.y = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
-    }
-  }
-  {
-    const voxel *vjm = vxl(vi->i, vi->j, vi->k - 1);
-    const voxel *vjp = vxl(vi->i, vi->j, vi->k + 1);
-    if (vjm && vjp) {
-      float gp = vjp->R - vi->R;
-      float gm = vi->R - vjm->R;
-      grad.z = 0.5 * (gp + gm);
-      if (std::abs(gp - gm) > 0.01)
-        disp.z = std::max(-0.59, std::min(0.59, -0.5 * (gp + gm) / (gp - gm)));
-    }
-  }
-  disp += 1.4 * grad;
-
-  // if (bi != bi->boss) {
-  //   dbl3 BosKidVec = *bi - *(bi->boss);
-  //   disp -=
-  //       0.5 * ((BosKidVec & disp) / (magSqr(BosKidVec) + 1e-12)) * BosKidVec;
-  // }
-  disp /= (0.55 * mag(disp) + 0.05);
-
-  voxel *vxlj = vxl(bi->fi + disp[0], bi->fj + disp[1], bi->fk + disp[2]);
-  if (vxlj && vi != vxlj && vxlj->R > vi->R && vxlj->ball == nullptr) {
-    bi->fi = vxlj->i - _mp5;
-    bi->fj = vxlj->j - _mp5;
-    bi->fk = vxlj->k - _mp5;
-    bi->R = vxlj->R;
-    bi->vxl->ball = nullptr;
-    bi->vxl = vxlj;
-    vxlj->ball = bi;
-    //++nrelocations;
-  }
-
-  // cout<<nrelocations<<" relocations "<<endl;
 }
 
-void makeFriend(medialBall *vi, medialBall *vj) {
-  if (vj->R > vi->R) {
-    medialBall *tmp = vi;
-    vi = vj;
-    vj = tmp;
-  }
-  if ((vi->R < 1.5 * vj->R) && (!vi->isNei(vj)) && (!vi->inParents(vj)) &&
-      !vj->inParents(vi)) {
-    vi->addNei(vj);
-    vj->addNei(vi);
-  }
-}
+// void makeFriend(medialBall *vi, medialBall *vj) {
+//   if (vj->R > vi->R) {
+//     medialBall *tmp = vi;
+//     vi = vj;
+//     vj = tmp;
+//   }
+//   if ((vi->R < 1.5 * vj->R) && (!vi->isNei(vj)) && (!vi->inParents(vj)) &&
+//       !vj->inParents(vi)) {
+//     vi->addNei(vj);
+//     vj->addNei(vi);
+//   }
+// }
 
-/*inline double cosAngleWithBossPerD(const medialBall* a, const medialBall* b) {
-        dbl3 v1=*a-*b;
-        if (b==b->boss) return 1./(mag(v1));
-        dbl3 v2=*b-*(b->boss);
+/*inline double cosAngleWithBossPerD(const medialBall* a, const medialBall* b)
+{ dbl3 v1=*a-*b; if (b==b->boss) return 1./(mag(v1)); dbl3 v2=*b-*(b->boss);
         double dotProd=v2&v1;
         return sqrt(dotProd*dotProd/(magSqr(v1)*magSqr(v1)*magSqr(v2)));
 }*/
@@ -494,9 +518,15 @@ void medialSurface::competeForParent(medialBall *vi, medialBall *vj) {
   const double dVal = sqrt(dSqr);
 
   const double wsinv = 1.0 / (riSqr + rjSqr);
-  const voxel *middlevxl = vxl(wsinv * (vi->fi * rjSqr + vj->fi * riSqr),
-                               wsinv * (vi->fj * rjSqr + vj->fj * riSqr),
-                               wsinv * (vi->fk * rjSqr + vj->fk * riSqr));
+  int iz_middle = wsinv * (vi->fk * rjSqr + vj->fk * riSqr),
+      iy_middle = wsinv * (vi->fj * rjSqr + vj->fj * riSqr),
+      ix_middel = wsinv * (vi->fi * rjSqr + vj->fi * riSqr);
+
+  if (iz_middle < 0 || iz_middle >= nz || iy_middle < 0 || iy_middle >= ny ||
+      ix_middel < 0 || ix_middel >= nx)
+    return;
+
+  const voxel *middlevxl = vxlMap(iz_middle, iy_middle, ix_middel);
 
   if (!middlevxl)
     return;
@@ -642,7 +672,7 @@ void medialSurface::findBoss(medialBall *vi) {
   float zo = vi->fk, yo = vi->fj, xo = vi->fi;
   float ripp = vi->R * 0.6 + 2. * _MSNoise + 2.;
   float ripp2 = ripp * ripp;
-  auto &binary_image = cg_.VImage.data_;
+
   float rz = ripp;
   for (float zi = -rz; zi < rz + 1e-6f; zi += 1.f) {
     float ry2 = ripp2 - zi * zi;
@@ -657,9 +687,9 @@ void medialSurface::findBoss(medialBall *vi) {
       for (float xi = -rx; xi < rx + 1e-6f; xi += 1.0f) {
         int z = zo + zi, y = yo + yi, x = xo + xi;
         if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
-            binary_image[z * ny * nx + y * nx + x] != 0)
+            binary_image(z, y, x) != 0)
           continue;
-        voxel *vj = vxl(x, y, z);
+        voxel *vj = vxlMap(z, y, x);
 
         if (vj->ball && (vi != vj->ball)) {
           competeForParent(vi, vj->ball);
@@ -781,11 +811,19 @@ void medialSurface::smoothRadius() {
 
   // std::vector<float> delRrr(vxlSpace.size(), 0.0f);
   (std::cout << "*").flush();
-  const auto &binary_image = cg_.VImage.data_;
+
   auto &pool = GlobalThreadPool::get();
   const size_t total_iterations = nVxls;
-  size_t nvoxels = binary_image.size();
-  auto delRrr = std::make_unique_for_overwrite<float[]>(nvoxels);
+  size_t nvoxels = binary_image_flat.size();
+  if (!nvoxels) {
+    std::cout << " no voxels no balls,\n" << std::endl;
+    exit(1);
+  }
+  // auto _delRrr = std::make_unique_for_overwrite<float[]>(nvoxels);
+  // std::mdspan<float, std::dextents<size_t, 3>> delRrr(_delRrr.get(), cg_.nz,
+  //                                                     cg_.ny, cg_.nx);
+
+  Eigen::Tensor<float, 3, Eigen::RowMajor> delRrr(cg_.nz, cg_.ny, cg_.nx);
 
   pool.detach_blocks(
       0, total_iterations, [&](const size_t start_idx, const size_t end_idx) {
@@ -799,13 +837,12 @@ void medialSurface::smoothRadius() {
               for (short xi = -1; xi < 2; ++xi) {
                 int z = zo + zi, y = yo + yi, x = xo + xi;
                 if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
-                    binary_image[z * ny * nx + y * nx + x] != 0)
+                    binary_image(z, y, x) != 0)
                   continue;
-                sumR += vxl(x, y, z)->R;
+                sumR += vxlMap(z, y, x)->R;
                 ++counter;
               }
-          delRrr[zo * ny * nx + yo * nx + xo] =
-              4. * sumR / (3 * counter + 27) - vi.R;
+          delRrr(zo, yo, xo) = 4. * sumR / (3 * counter + 27) - vi.R;
         }
       });
   pool.wait();
@@ -824,13 +861,13 @@ void medialSurface::smoothRadius() {
               for (short xi = -1; xi < 2; ++xi) {
                 int z = zo + zi, y = yo + yi, x = xo + xi;
                 if (z < 0 || z >= nz || y < 0 || y >= ny || x < 0 || x >= nx ||
-                    binary_image[z * ny * nx + y * nx + x] != 0)
+                    binary_image(z, y, x) != 0)
                   continue;
-                sumDelR += delRrr[z * ny * nx + y * nx + x];
+                sumDelR += delRrr(z, y, x);
                 ++counter;
               }
           vi.R +=
-              std::min(std::max(0.02 * (delRrr[zo * ny * nx + yo * nx + xo] -
+              std::min(std::max(0.02 * (delRrr(zo, yo, xo) -
                                         0.99 * 2. * sumDelR / (counter + 27)),
                                 -0.005),
                        0.01);
@@ -845,17 +882,18 @@ void medialSurface::smoothRadius() {
   // for (size_t i = 0; i < vxlSpace.size(); ++i)
   //   maxrrr = std::max(maxrrr, vxlSpace[i].R);
 
-  auto it =
+  float maxrrr =
       std::max_element(vxlSpace.begin(), vxlSpace.end(),
-                       [](const auto &a, const auto &b) { return a.R < b.R; });
-  float maxrrr = (it != vxlSpace.end()) ? it->R : 0.0f;
+                       [](const auto &a, const auto &b) { return a.R < b.R; })
+          ->R;
 
   std::cout << " maxrrr " << maxrrr << std::endl;
 }
 
-void medialSurface::
-    createBallsAndHierarchy() { /// Create distance map, maximal-spheres, and
-                                /// their hirarchy (medial-surface connectivity)
+void medialSurface::createBallsAndHierarchy() { /// Create distance map,
+                                                /// maximal-spheres, and their
+                                                /// hirarchy (medial-surface
+                                                /// connectivity)
   //	mediaAxes medAxis(*this, minRP, clipOutSideBallFraction,
   // clipOutSideBallFraction*0.5+0.);
 

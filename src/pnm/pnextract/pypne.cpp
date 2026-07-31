@@ -1,11 +1,13 @@
-#include <cstdint>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-
-#include "blockNet.h"
 #include "pypne.h"
+#include "blockNet.h"
 #include "writers.h"
+#include <cstdint>
 #include <iostream>
+#include <Eigen/CXX11/Tensor>
+
+
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -47,6 +49,13 @@ auto genextraction(const int nx, const int ny, const int nz,
   std::vector<uint8_t> data(static_cast<uint8_t *>(buf.ptr),
                             static_cast<uint8_t *>(buf.ptr) +
                                 buf.size * buf.itemsize);
+
+
+  // Eigen::TensorMap<Eigen::Tensor<uint8_t, 3, Eigen::RowMajor>> data_tensor(
+  //     static_cast<uint8_t *>(buf.ptr), nz, ny, nx);
+
+  // Eigen::Tensor<uint8_t, 1> view =
+  //     data_tensor.reshape(Eigen::array<Eigen::Index, 1>{nz * ny * nx});
 
   voxelImageT_PYPNE<uint8_t> vm;
   vm.setData(data); // data to moved to vm, do not use data after this line

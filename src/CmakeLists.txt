@@ -8,7 +8,8 @@ target_include_directories(voxel PUBLIC
 )
 target_include_directories(voxel PUBLIC
     ${CMAKE_SOURCE_DIR}/src/include
-    ${CMAKE_SOURCE_DIR}/thirdparty/system
+    ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1
+    ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1/unsupported
 )
 
 add_library(pypne_core STATIC

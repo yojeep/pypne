@@ -2,6 +2,7 @@
 #define ELEMENT_H
 
 #include "typses.h"
+#include <climits>
 #include <map>
 #include <iostream>
 
@@ -15,7 +16,7 @@ class voxel
 {
 public:
 	voxel(int ii, int jj, int kk, float rR) :  i(ii), j(jj), k(kk), R(rR), ball(nullptr) {};
-	voxel() :i(SIZE_MAX), j(SIZE_MAX), k(SIZE_MAX), R(0),ball(nullptr) {};
+	voxel() :i(LONG_MAX), j(LONG_MAX), k(LONG_MAX), R(0.f),ball(nullptr) {};
 public:
 	int i, j, k;
 	float R;
@@ -153,16 +154,39 @@ public:
 class medialBall
 {
 public:
+	float _0() const { return fi; }
+	float _1() const { return fj; }
+	float _2() const { return fk; }
+	dbl3 node() const { return dbl3(fi, fj, fk); }
+
+	voxel *vxl;
+	float fi, fj, fk;
+	short type;
+	float R; ///< radius
+	// unsigned short nKids;
+	// unsigned short ikid;
+	// unsigned short nNeis;
+	// unsigned short mark;
+	unsigned short corId;
+	medialBall *boss;
+	// medialBall **kids;
+	// medialBall **neis;
+
+public:
 	medialBall() = delete;
-	medialBall(short t) : vxl(nullptr), fi(-10000), fj(-0.5), fk(-10000), type(t), R(-10000), nKids(0), nNeis(0), corId(0), boss(this), kids(nullptr), neis(nullptr) {};
-	medialBall(voxel *v, short t) : vxl(v), fi(v->i - _mp5), fj(v->j - _mp5), fk(v->k - _mp5), type(t), R(v->R), nKids(0), nNeis(0), corId(0), boss(this), kids(nullptr), neis(nullptr) {};
+	medialBall(short t) : vxl(nullptr), fi(-10000), fj(-0.5), fk(-10000), type(t), R(-10000), corId(0), boss(this){}//, nKids(0), nNeis(0), kids(nullptr), neis(nullptr) {};
+	medialBall(voxel *v, short t) : vxl(v), fi(v->i - _mp5), fj(v->j - _mp5), fk(v->k - _mp5), type(t), R(v->R), corId(0), boss(this){}//, nKids(0), nNeis(0), kids(nullptr), neis(nullptr) {};
 	~medialBall()
 	{
-		if (kids)
-			delete[] kids;
-		if (neis)
-			delete[] neis;
+		// if (kids)
+		// 	delete[] kids;
+		// if (neis)
+		// 	delete[] neis;
 	}
+	int iz() const { return static_cast<int>(fk); }
+	int iy() const { return static_cast<int>(fj); }
+	int ix() const { return static_cast<int>(fi); }
+
 
 	// short level() const
 	// {
@@ -235,13 +259,13 @@ public:
 	// return pMin;
 	//}
 
-	bool isNei(const medialBall *bal) const
-	{
-		for (int ii = 0; ii < nNeis; ++ii)
-			if (neis[ii] == bal)
-				return true;
-		return false;
-	}
+	// bool isNei(const medialBall *bal) const
+	// {
+	// 	for (int ii = 0; ii < nNeis; ++ii)
+	// 		if (neis[ii] == bal)
+	// 			return true;
+	// 	return false;
+	// }
 	// bool neisNotNeiWith(const medialBall* bal) const
 	//{	for (int ii=0;ii<nNeis;++ii)  if (neis[ii]->isNei(bal))  return false;
 	// return true;
@@ -251,24 +275,24 @@ public:
 	// std::cout<<"no nei found! "<<int(nNeis)<<std::endl;
 	// return neis[1000];
 	//}
-	void removeKidBoss(medialBall *kid)
-	{
-		if (nKids > 1)
-		{
-			int ii = -1;
-			for (int kk = 0; kk < nKids; ++kk)
-				if (kids[kk] != kid)
-					kids[++ii] = kids[kk];
-			nKids = ii + 1;
-		}
-		else if (nKids == 1 && kids[0] == kid)
-		{
-			delete[] kids;
-			kids = nullptr;
-			nKids = 0;
-		}
-		kid->boss = boss;
-	}
+	// void removeKidBoss(medialBall *kid)
+	// {
+	// 	if (nKids > 1)
+	// 	{
+	// 		int ii = -1;
+	// 		for (int kk = 0; kk < nKids; ++kk)
+	// 			if (kids[kk] != kid)
+	// 				kids[++ii] = kids[kk];
+	// 		nKids = ii + 1;
+	// 	}
+	// 	else if (nKids == 1 && kids[0] == kid)
+	// 	{
+	// 		delete[] kids;
+	// 		kids = nullptr;
+	// 		nKids = 0;
+	// 	}
+	// 	kid->boss = boss;
+	// }
 	// bool isKid(const medialBall* kid) const
 	//{	for (int ii=0;ii<nKids;++ii)  if (kids[ii]==kid)  return  true;
 	// return false;
@@ -279,45 +303,28 @@ public:
 	// return kids[1000];
 	//}
 
-	void addNei(medialBall *vj)
-	{
-		if (nNeis > 0)
-		{
-			medialBall **ownNeis = neis;
-			neis = new medialBall *[nNeis + 1];
-			int kk = -1;
-			while (++kk < nNeis)
-				neis[kk] = ownNeis[kk];
-			delete[] ownNeis;
-			neis[kk] = vj;
-			++nNeis;
-		}
-		else
-		{
-			neis = new medialBall *[1];
-			neis[0] = vj;
-			nNeis = 1;
-		}
-	}
+	// void addNei(medialBall *vj)
+	// {
+	// 	if (nNeis > 0)
+	// 	{
+	// 		medialBall **ownNeis = neis;
+	// 		neis = new medialBall *[nNeis + 1];
+	// 		int kk = -1;
+	// 		while (++kk < nNeis)
+	// 			neis[kk] = ownNeis[kk];
+	// 		delete[] ownNeis;
+	// 		neis[kk] = vj;
+	// 		++nNeis;
+	// 	}
+	// 	else
+	// 	{
+	// 		neis = new medialBall *[1];
+	// 		neis[0] = vj;
+	// 		nNeis = 1;
+	// 	}
+	// }
 
-public:
-	float _0() const { return fi; }
-	float _1() const { return fj; }
-	float _2() const { return fk; }
-	dbl3 node() const { return dbl3(fi, fj, fk); }
 
-	voxel *vxl;
-	float fi, fj, fk;
-	short type;
-	float R; ///< radius
-	unsigned short nKids;
-	unsigned short ikid;
-	unsigned short nNeis;
-	unsigned short mark;
-	unsigned short corId;
-	medialBall *boss;
-	medialBall **kids;
-	medialBall **neis;
 };
 
 inline bool operator!=(const medialBall &a, const voxel &b)
