@@ -76,23 +76,25 @@ void blockNetwork::CreateVElem(
     }
   }
 
-  VElems.reset(cg.nx + 2, cg.ny + 2, cg.nz + 2, -257);
+  // VElems.reset(cg.nx + 2, cg.ny + 2, cg.nz + 2, -257);
+  VElems.reset(cg.nx + 2, cg.ny + 2, cg.nz + 2, -1);
   VElems.X0Ch() = cg.VImage.X0() - cg.VImage.dx();
   VElems.dxCh() = cg.VImage.dx();
-  int nVVs = 0;
-  for (int iz = 0; iz < cg.nz; ++iz) {
-    for (int iy = 0; iy < cg.ny; ++iy) {
-      const segments &s = cg.segs_[iz * cg.ny + iy];
-      for (int ix = 0; ix < s.cnt; ++ix) {
-        int value = -1 - int(s.s[ix].value);
-        nVVs = std::max(nVVs, value);
-        for (int i = s.s[ix].start; i < s.s[ix + 1].start; ++i) {
-          VElems(i + 1, iy + 1, iz + 1) = value;
-        }
-      }
-    }
-  }
-  ++nVVs;
+  // int nVVs = 0;
+  // for (int iz = 0; iz < cg.nz; ++iz) {
+  //   for (int iy = 0; iy < cg.ny; ++iy) {
+  //     const segments &s = cg.segs_[iz * cg.ny + iy];
+  //     for (int ix = 0; ix < s.cnt; ++ix) {
+  //       int value = -1 - int(s.s[ix].value);
+  //       nVVs = std::max(nVVs, value);
+  //       for (int i = s.s[ix].start; i < s.s[ix + 1].start; ++i) {
+  //         VElems(i + 1, iy + 1, iz + 1) = value;
+  //       }
+  //     }
+  //   }
+  // }
+  // ++nVVs;
+  int nVVs = 1;
   VElems.setSlice('i', 0, 0);
   VElems.setSlice('i', cg.nx + 1, 1);
   if (nBP6 == 6) {
@@ -103,7 +105,7 @@ void blockNetwork::CreateVElem(
   } else {
     VElems.setSlice('j', 0,
                     -1 - 2 - nVVs); // TODO: check, this means negatives can not
-                                    // be sued to uniquely identify pores
+                                    // be used to uniquely identify pores
     VElems.setSlice('j', cg.ny + 1, -1 - 3 - nVVs);
     VElems.setSlice('k', 0, -1 - 4 - nVVs);
     VElems.setSlice('k', cg.nz + 1, -1 - 5 - nVVs);
@@ -177,7 +179,7 @@ void blockNetwork::CreateVElem(
             if (Vi == uasyned)
               VElems(xVE, yVE, zVE) = Vm;
             else if (Vi != Vm) {
-              voxel *vi = srf->vxl(x, y, z);
+              voxel *vi = vxlMap(z, y, x);
               if (!vi->ball && vi->R < r) {
                 const medialBall *bvi = poreIs[Vi]->mb;
                 float zif = zf - bvi->fk, yif = yf - bvi->fj,
@@ -205,17 +207,83 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
 
   // vector<int> iThroatFaces;
   // iThroatFaces.reserve(throatIs.size()+poreIs.size()*10);
+  const Eigen::TensorMap<Eigen::Tensor<uint8_t, 3, Eigen::RowMajor>>
+      &binary_image = srf->binary_image;
+  const std::vector<voxel> &vxlSpace = srf->vxlSpace;
+  const Eigen::Tensor<voxel *, 3, Eigen::RowMajor> &vxlMap = srf->vxlMap;
+  const std::vector<medialBall> &ballSpace = srf->ballSpace;
+  struct NeighborOffset {
+    int dz, dy, dx;
+  };
+
+  static constexpr std::array<NeighborOffset, 6> NEIGHBOR_OFFSETS = {{
+      {0, 0, 1}, // i+1
+      {0, 1, 0}, // j+1
+      {1, 0, 0}  // k+1
+  }};
+
   {
     std::cout << "\nlooking for connections, iFirst = " << throatIs.size()
               << " ..  ";
     std::cout.flush();
 
-    for (int i = 0; i < VElems.nx() - 1; i++)
-      for (int k = 1; k < VElems.nz() - 1; ++k)
-        for (int j = 1; j < VElems.ny() - 1; ++j) {
-          int p1ID = VElems(i, j, k);
+    for (voxel vi : vxlSpace) {
+      int x0 = vi.i;
+      int y0 = vi.j;
+      int z0 = vi.k;
+      int p0ID = VElems(x0, y0, z0);
+
+      if (p0ID < 0)
+        continue;
+      for (const auto &offset : NEIGHBOR_OFFSETS) {
+        int x1 = x0 + offset.dx;
+        int y1 = y0 + offset.dy;
+        int z1 = z0 + offset.dz;
+        int p1ID = VElems(x1, y1, z1);
+        if (p0ID == p1ID || p1ID < 0 || (p0ID + p1ID) < 2)
+          continue;
+        bool dir = p1ID > p0ID;
+        if (!dir) {
+          std::swap(p0ID, p1ID);
+        }
+        poreNE *p0 = poreIs[p0ID];
+        poreNE *p1 = poreIs[p1ID];
+
+        if (!p0)
+          std::cout << "  ERROR p0ID" << p0ID << std::endl;
+        int tIDNext = throatIs.size();
+        std::pair<std::map<int, int>::iterator, bool> ret =
+            p1->contacts.insert(std::pair<int, int>(p0ID, tIDNext));
+        if (ret.second) {
+
+          if (ret.second !=
+              p0->contacts.insert(std::pair<int, int>(p1ID, tIDNext)).second)
+            std::cout << "Errorpnm821-2 " << p0ID << " " << p1ID << std::endl;
+          throatIs.push_back(new throatNE(tIDNext, p0ID, p1ID));
+          // if (p1ID<2 &&p2ID<2) cout <<"Errskziw1: p1ID<2 &&p2ID<2:
+          // tid: "<< tIDNext<<"  "<<i<<" "<<j<<" "<<k<<" " <<"
+          // "<<p1->mb->fi<<" "<<p1->mb->fj<<" "<<p1->mb->fk<<" "<<"
+          // "<<p2->mb->fi<<" "<<p2->mb->fj<<" "<<p2->mb->fk<<" "<<endl;
+        }
+        throatNE *trot = throatIs[ret.first->second];
+        trot->CrosArea.x += (2 * dir - 1);
+        // trot->C[0] += int3{{i-1,j-1,k-1}};
+
+        if (p0ID >= firstPore) {
+          ++(p0->surfaceArea);
+          ++(p0->volumn);
+        }
+        if (p1ID >= firstPore)
+          ++(p1->surfaceArea);
+      }
+    }
+
+    for (int z = 1; z < VElems.nz() - 1; ++z)
+      for (int y = 1; y < VElems.ny() - 1; ++y)
+        for (int x = 0; x < VElems.nx() - 1; ++x) {
+          int p1ID = VElems(x, y, z);
           if (p1ID >= 0) {
-            int p2ID = VElems(i + 1, j, k);
+            int p2ID = VElems(x + 1, y, z);
             if (p1ID != p2ID) {
               if (p2ID >= 0) {
                 bool dir = p2ID > p1ID;
@@ -265,12 +333,12 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
 
     (std::cout << throatIs.size() << " .. ").flush();
 
-    for (int j = 0; j < VElems.ny() - 1; j++) //     y >-<
-      for (int k = 1; k < VElems.nz() - 1; ++k)
-        for (int i = 1; i < VElems.nx() - 1; ++i) {
-          int p1ID = VElems(i, j, k);
+    for (int z = 1; z < VElems.nz() - 1; z++) //     y >-<
+      for (int y = 0; y < VElems.ny() - 1; ++y)
+        for (int x = 1; x < VElems.nx() - 1; ++x) {
+          int p1ID = VElems(x, y, z);
           if (p1ID >= 0) {
-            int p2ID = VElems(i, j + 1, k);
+            int p2ID = VElems(x, y + 1, z);
             if (p1ID != p2ID) {
               if (p2ID >= 0) {
                 bool dir = p2ID > p1ID;
@@ -313,12 +381,12 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
 
     (std::cout << throatIs.size() << " .. ").flush();
 
-    for (int k = 0; k < VElems.nz() - 1; ++k) //     z >-<
-      for (int j = 1; j < VElems.ny() - 1; ++j)
-        for (int i = 1; i < VElems.nx() - 1; ++i) {
-          int p1ID = VElems(i, j, k);
+    for (int z = 0; z < VElems.nz() - 1; ++z) //     z >-<
+      for (int y = 1; y < VElems.ny() - 1; ++y)
+        for (int x = 1; x < VElems.nx() - 1; ++x) {
+          int p1ID = VElems(x, y, z);
           if (p1ID >= 0) {
-            int p2ID = VElems(i, j, k + 1);
+            int p2ID = VElems(x, y, z + 1);
             if (p1ID != p2ID) {
               if (p2ID >= 0) {
                 bool dir = p2ID > p1ID;
@@ -419,11 +487,11 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
           poreNE *p1 = poreIs[p1ID];
           throatNE *trot = throatIs[p1->contacts[nei]];
           if (p1ID > nei) {
-            dbgAsrt(srf->vxl(i - 1, j - 1, k - 1));
-            trot->toxels2.push_back((srf->vxl(i - 1, j - 1, k - 1)));
+            dbgAsrt(vxlMap(k - 1, j - 1, i - 1));
+            trot->toxels2.push_back(vxlMap(k - 1, j - 1, i - 1));
           } else {
-            dbgAsrt(srf->vxl(i - 1, j - 1, k - 1));
-            trot->toxels1.push_back((srf->vxl(i - 1, j - 1, k - 1)));
+            dbgAsrt(vxlMap(k - 1, j - 1, i - 1));
+            trot->toxels1.push_back(vxlMap(k - 1, j - 1, i - 1));
           }
         }
         if (neis.size() > 1)
