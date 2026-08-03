@@ -1,4 +1,5 @@
 #include "blockNet.h"
+#include <array>
 #include <iostream>
 #include <vector>
 
@@ -212,224 +213,259 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
   const std::vector<voxel> &vxlSpace = srf->vxlSpace;
   const Eigen::Tensor<voxel *, 3, Eigen::RowMajor> &vxlMap = srf->vxlMap;
   const std::vector<medialBall> &ballSpace = srf->ballSpace;
-  struct NeighborOffset {
-    int dz, dy, dx;
-  };
-
-  static constexpr std::array<NeighborOffset, 6> NEIGHBOR_OFFSETS = {{
-      {0, 0, 1}, // i+1
-      {0, 1, 0}, // j+1
-      {1, 0, 0}  // k+1
-  }};
 
   {
     std::cout << "\nlooking for connections, iFirst = " << throatIs.size()
               << " ..  ";
     std::cout.flush();
 
-    for (voxel vi : vxlSpace) {
-      int x0 = vi.i;
-      int y0 = vi.j;
-      int z0 = vi.k;
-      int p0ID = VElems(x0, y0, z0);
+    // Use fixed-size arrays to avoid any dynamic memory allocation
+    const int dx[3] = {1, 0, 0};
+    const int dy[3] = {0, 1, 0};
+    const int dz[3] = {0, 0, 1};
+    const int signs[6] = {1, -1, 1, -1, 1, -1};
+    const int axes[6] = {0, 0, 1, 1, 2, 2};
 
+    for (const voxel &vi : vxlSpace) {
+      int x0 = vi.i + 1;
+      int y0 = vi.j + 1;
+      int z0 = vi.k + 1;
+
+      int p0ID = VElems(x0, y0, z0);
       if (p0ID < 0)
         continue;
-      for (const auto &offset : NEIGHBOR_OFFSETS) {
-        int x1 = x0 + offset.dx;
-        int y1 = y0 + offset.dy;
-        int z1 = z0 + offset.dz;
-        int p1ID = VElems(x1, y1, z1);
-        if (p0ID == p1ID || p1ID < 0 || (p0ID + p1ID) < 2)
+
+      poreNE *p0 = poreIs[p0ID];
+      if (p0ID >= firstPore)
+        ++(p0->volumn);
+
+      // Core trick: use a bitmask to combine directions to check
+      // Bits 0,1,2 correspond to +X, +Y, +Z respectively.
+      // By default only positive directions are checked (1|2|4 = 7).
+      // If on a boundary (e.g. x0==1), also add the negative direction.
+      int mask = 1 | 2 | 4;
+      if (x0 == 1)
+        mask |= 8; // add -X
+      if (y0 == 1)
+        mask |= 16; // add -Y
+      if (z0 == 1)
+        mask |= 32; // add -Z
+
+      // Loop over all six possible directions (0..5)
+      for (int d = 0; d < 6; ++d) {
+        // Skip direction if not enabled by the mask
+        if (!(mask & (1 << d)))
           continue;
-        bool dir = p1ID > p0ID;
-        if (!dir) {
-          std::swap(p0ID, p1ID);
-        }
-        poreNE *p0 = poreIs[p0ID];
-        poreNE *p1 = poreIs[p1ID];
 
-        if (!p0)
-          std::cout << "  ERROR p0ID" << p0ID << std::endl;
-        int tIDNext = throatIs.size();
-        std::pair<std::map<int, int>::iterator, bool> ret =
-            p1->contacts.insert(std::pair<int, int>(p0ID, tIDNext));
+        // Determine offset based on direction index
+        // d=0,1 -> X-axis (+/-), d=2,3 -> Y-axis (+/-), d=4,5 -> Z-axis (+/-)
+        int sign = signs[d];
+        int axis = axes[d];
+
+        int nx = x0 + dx[axis] * sign;
+        int ny = y0 + dy[axis] * sign;
+        int nz = z0 + dz[axis] * sign;
+
+        int p1ID = VElems(nx, ny, nz);
+        if (p1ID < 0 || p0ID == p1ID)
+          continue;
+
+        // Canonical ordering to ensure undirected graph connectivity is unique
+        bool dir = p0ID < p1ID;
+        int lID = dir ? p0ID : p1ID;
+        int hID = dir ? p1ID : p0ID;
+
+        poreNE *pLow = poreIs[lID];
+        poreNE *pHigh = poreIs[hID];
+
+        // Establish throat connectivity
+        int tIDNext = static_cast<int>(throatIs.size());
+        auto ret = pHigh->contacts.emplace(lID, tIDNext);
         if (ret.second) {
-
-          if (ret.second !=
-              p0->contacts.insert(std::pair<int, int>(p1ID, tIDNext)).second)
-            std::cout << "Errorpnm821-2 " << p0ID << " " << p1ID << std::endl;
-          throatIs.push_back(new throatNE(tIDNext, p0ID, p1ID));
-          // if (p1ID<2 &&p2ID<2) cout <<"Errskziw1: p1ID<2 &&p2ID<2:
-          // tid: "<< tIDNext<<"  "<<i<<" "<<j<<" "<<k<<" " <<"
-          // "<<p1->mb->fi<<" "<<p1->mb->fj<<" "<<p1->mb->fk<<" "<<"
-          // "<<p2->mb->fi<<" "<<p2->mb->fj<<" "<<p2->mb->fk<<" "<<endl;
+          if (!pLow->contacts.emplace(hID, tIDNext).second) {
+            std::cout << "Errorpnm821-2 " << lID << " " << hID << std::endl;
+          }
+          throatIs.push_back(new throatNE(tIDNext, lID, hID));
         }
+
+        // Accumulate cross-sectional area contribution
+        // Positive direction: +1, negative direction: -1
         throatNE *trot = throatIs[ret.first->second];
-        trot->CrosArea.x += (2 * dir - 1);
-        // trot->C[0] += int3{{i-1,j-1,k-1}};
+        trot->CrosArea[axis] += dir ? sign : -sign;
 
-        if (p0ID >= firstPore) {
-          ++(p0->surfaceArea);
-          ++(p0->volumn);
-        }
-        if (p1ID >= firstPore)
-          ++(p1->surfaceArea);
+        // Accumulate surface area for both pores
+        if (lID >= firstPore)
+          ++(pLow->surfaceArea);
+        if (hID >= firstPore)
+          ++(pHigh->surfaceArea);
       }
     }
 
-    for (int z = 1; z < VElems.nz() - 1; ++z)
-      for (int y = 1; y < VElems.ny() - 1; ++y)
-        for (int x = 0; x < VElems.nx() - 1; ++x) {
-          int p1ID = VElems(x, y, z);
-          if (p1ID >= 0) {
-            int p2ID = VElems(x + 1, y, z);
-            if (p1ID != p2ID) {
-              if (p2ID >= 0) {
-                bool dir = p2ID > p1ID;
-                if (!dir) {
-                  int tmp = p1ID;
-                  p1ID = p2ID;
-                  p2ID = tmp;
-                }
-
-                poreNE *p1 = poreIs[p1ID];
-                poreNE *p2 = poreIs[p2ID];
-
-                if (!p1)
-                  std::cout << "  ERROR p1ID" << p1ID << std::endl;
-                int tIDNext = throatIs.size();
-                std::pair<std::map<int, int>::iterator, bool> ret =
-                    p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
-                if (ret.second) {
-
-                  if (ret.second !=
-                      p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext))
-                          .second)
-                    std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID
-                              << std::endl;
-                  throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
-                  // if (p1ID<2 &&p2ID<2) cout <<"Errskziw1: p1ID<2 &&p2ID<2:
-                  // tid: "<< tIDNext<<"  "<<i<<" "<<j<<" "<<k<<" " <<"
-                  // "<<p1->mb->fi<<" "<<p1->mb->fj<<" "<<p1->mb->fk<<" "<<"
-                  // "<<p2->mb->fi<<" "<<p2->mb->fj<<" "<<p2->mb->fk<<" "<<endl;
-                }
-                throatNE *trot = throatIs[ret.first->second];
-                trot->CrosArea.x += (2 * dir - 1);
-                // trot->C[0] += int3{{i-1,j-1,k-1}};
-              }
-
-              if (p1ID >= firstPore)
-                ++(poreIs[p1ID]->surfaceArea);
-              if (p2ID >= firstPore)
-                ++(poreIs[p2ID]->surfaceArea);
-            }
-
-            if (p1ID >= firstPore) {
-              ++(poreIs[p1ID]->volumn);
-            }
-          }
-        }
-
-    (std::cout << throatIs.size() << " .. ").flush();
-
-    for (int z = 1; z < VElems.nz() - 1; z++) //     y >-<
-      for (int y = 0; y < VElems.ny() - 1; ++y)
-        for (int x = 1; x < VElems.nx() - 1; ++x) {
-          int p1ID = VElems(x, y, z);
-          if (p1ID >= 0) {
-            int p2ID = VElems(x, y + 1, z);
-            if (p1ID != p2ID) {
-              if (p2ID >= 0) {
-                bool dir = p2ID > p1ID;
-                if (!dir) {
-                  int tmp = p1ID;
-                  p1ID = p2ID;
-                  p2ID = tmp;
-                }
-
-                poreNE *p1 = poreIs[p1ID];
-                poreNE *p2 = poreIs[p2ID];
-
-                if (!p1)
-                  std::cout << "  ERROR p1ID" << p1ID << std::endl;
-                int tIDNext = throatIs.size();
-                std::pair<std::map<int, int>::iterator, bool> ret =
-                    p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
-                if (ret.second) {
-                  if (ret.second !=
-                      p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext))
-                          .second)
-                    std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID
-                              << std::endl;
-                  throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
-                  // if (p1ID<2 &&p2ID<2) cout <<"Errskziw2: p1ID<2 &&p2ID<2:
-                  // tid: "<< tIDNext<<endl;
-                }
-                throatNE *trot = throatIs[ret.first->second];
-                trot->CrosArea.y += (2 * dir - 1);
-                // trot->C[1] += int3{{i-1,j-1,k-1}};
-              }
-
-              if (p1ID >= firstPore)
-                ++(poreIs[p1ID]->surfaceArea);
-              if (p2ID >= firstPore)
-                ++(poreIs[p2ID]->surfaceArea);
-            }
-          }
-        }
-
-    (std::cout << throatIs.size() << " .. ").flush();
-
-    for (int z = 0; z < VElems.nz() - 1; ++z) //     z >-<
-      for (int y = 1; y < VElems.ny() - 1; ++y)
-        for (int x = 1; x < VElems.nx() - 1; ++x) {
-          int p1ID = VElems(x, y, z);
-          if (p1ID >= 0) {
-            int p2ID = VElems(x, y, z + 1);
-            if (p1ID != p2ID) {
-              if (p2ID >= 0) {
-                bool dir = p2ID > p1ID;
-                if (!dir) {
-                  int tmp = p1ID;
-                  p1ID = p2ID;
-                  p2ID = tmp;
-                }
-                poreNE *p1 = poreIs[p1ID];
-                poreNE *p2 = poreIs[p2ID];
-
-                if (!p1)
-                  std::cout << "  ERROR p1ID" << p1ID << std::endl;
-                int tIDNext = throatIs.size();
-                std::pair<std::map<int, int>::iterator, bool> ret =
-                    p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
-                if (ret.second) {
-                  if (ret.second !=
-                      p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext))
-                          .second)
-                    std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID
-                              << std::endl;
-                  throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
-                  // if (p1ID<2 &&p2ID<2) cout <<"Errskziw3: p1ID<2 &&p2ID<2:
-                  // tid: "<< tIDNext<<endl;
-                }
-                throatNE *trot = throatIs[ret.first->second];
-                trot->CrosArea.z += (2 * dir - 1);
-                // trot->C[2] += int3{{i-1,j-1,k-1}};
-              }
-
-              if (p1ID >= firstPore)
-                ++(poreIs[p1ID]->surfaceArea);
-              if (p2ID >= firstPore)
-                ++(poreIs[p2ID]->surfaceArea);
-            }
-          }
-        }
-
     (std::cout << throatIs.size() << ", ").flush();
+
+  //   for (int z = 1; z < VElems.nz() - 1; ++z)
+  //     for (int y = 1; y < VElems.ny() - 1; ++y)
+  //       for (int x = 0; x < VElems.nx() - 1; ++x) {
+  //         int p1ID = VElems(x, y, z);
+  //         if (p1ID >= 0) {
+  //           int p2ID = VElems(x + 1, y, z);
+  //           if (p1ID != p2ID) {
+  //             if (p2ID >= 0) {
+  //               bool dir = p2ID > p1ID;
+  //               if (!dir) {
+  //                 int tmp = p1ID;
+  //                 p1ID = p2ID;
+  //                 p2ID = tmp;
+  //               }
+
+  //               poreNE *p1 = poreIs[p1ID];
+  //               poreNE *p2 = poreIs[p2ID];
+
+  //               if (!p1)
+  //                 std::cout << "  ERROR p1ID" << p1ID << std::endl;
+  //               int tIDNext = throatIs.size();
+  //               auto ret =
+  //                   p2->contacts.insert(std::pair<int, int>(p1ID, tIDNext));
+  //               if (ret.second) {
+
+  //                 if (ret.second !=
+  //                     p1->contacts.insert(std::pair<int, int>(p2ID, tIDNext))
+  //                         .second)
+  //                   std::cout << "Errorpnm821-2 " << p1ID << " " << p2ID
+  //                             << std::endl;
+  //                 throatIs.push_back(new throatNE(tIDNext, p1ID, p2ID));
+  //                 // if (p1ID<2 &&p2ID<2) cout <<"Errskziw1: p1ID<2 &&p2ID<2:
+  //                 // tid: "<< tIDNext<<"  "<<i<<" "<<j<<" "<<k<<" " <<"
+  //                 // "<<p1->mb->fi<<" "<<p1->mb->fj<<" "<<p1->mb->fk<<" "<<"
+  //                 // "<<p2->mb->fi<<" "<<p2->mb->fj<<" "<<p2->mb->fk<<"
+  //                 // "<<endl;
+  //               }
+  //               throatNE *trot = throatIs[ret.first->second];
+  //               trot->CrosArea.x += (2 * dir - 1);
+  //               // trot->C[0] += int3{{i-1,j-1,k-1}};
+  //             }
+
+  //             if (p1ID >= firstPore)
+  //               ++(poreIs[p1ID]->surfaceArea);
+  //             if (p2ID >= firstPore)
+  //               ++(poreIs[p2ID]->surfaceArea);
+  //           }
+
+  //           if (p1ID >= firstPore) {
+  //             ++(poreIs[p1ID]->volumn);
+  //           }
+  //         }
+  //       }
+
+  //   (std::cout << throatIs.size() << " .. ").flush();
+
+  //   for (int z = 1; z < VElems.nz() - 1; z++) //     y >-<
+  //     for (int y = 0; y < VElems.ny() - 1; ++y)
+  //       for (int x = 1; x < VElems.nx() - 1; ++x) {
+  //         int p1ID = VElems(x, y, z);
+  //         if (p1ID >= 0) {
+  //           int p2ID = VElems(x, y + 1, z);
+  //           if (p1ID != p2ID) {
+  //             if (p2ID >= 0) {
+  //               bool dir = p2ID > p1ID;
+  //               if (!dir) {
+  //                 int tmp = p1ID;
+  //                 p1ID = p2ID;
+  //                 p2ID = tmp;
+  //               }
+
+  //               poreNE *p1 = poreIs[p1ID];
+  //               poreNE *p2 = poreIs[p2ID];
+
+  //               if (!p1)
+  //                 std::cout << "  ERROR p1ID" << p1ID << std::endl;
+  //               int tIDNext = throatIs.size();
+  //               auto ret =
+  //                   p2->contacts.insert(std::pair<int, int>(p1ID,
+  //                   tIDNext));
+  //               if (ret.second) {
+  //                 if (ret.second !=
+  //                     p1->contacts.insert(std::pair<int, int>(p2ID,
+  //                     tIDNext))
+  //                         .second)
+  //                   std::cout << "Errorpnm821-2 " << p1ID << " " <<
+  //                   p2ID
+  //                             << std::endl;
+  //                 throatIs.push_back(new throatNE(tIDNext, p1ID,
+  //                 p2ID));
+  //                 // if (p1ID<2 &&p2ID<2) cout <<"Errskziw2: p1ID<2
+  //                 // &&p2ID<2:
+  //                 // tid: "<< tIDNext<<endl;
+  //               }
+  //               throatNE *trot = throatIs[ret.first->second];
+  //               trot->CrosArea.y += (2 * dir - 1);
+  //               // trot->C[1] += int3{{i-1,j-1,k-1}};
+  //             }
+
+  //             if (p1ID >= firstPore)
+  //               ++(poreIs[p1ID]->surfaceArea);
+  //             if (p2ID >= firstPore)
+  //               ++(poreIs[p2ID]->surfaceArea);
+  //           }
+  //         }
+  //       }
+
+  //   (std::cout << throatIs.size() << " .. ").flush();
+
+  //   for (int z = 0; z < VElems.nz() - 1; ++z) //     z >-<
+  //     for (int y = 1; y < VElems.ny() - 1; ++y)
+  //       for (int x = 1; x < VElems.nx() - 1; ++x) {
+  //         int p1ID = VElems(x, y, z);
+  //         if (p1ID >= 0) {
+  //           int p2ID = VElems(x, y, z + 1);
+  //           if (p1ID != p2ID) {
+  //             if (p2ID >= 0) {
+  //               bool dir = p2ID > p1ID;
+  //               if (!dir) {
+  //                 int tmp = p1ID;
+  //                 p1ID = p2ID;
+  //                 p2ID = tmp;
+  //               }
+  //               poreNE *p1 = poreIs[p1ID];
+  //               poreNE *p2 = poreIs[p2ID];
+
+  //               if (!p1)
+  //                 std::cout << "  ERROR p1ID" << p1ID << std::endl;
+  //               int tIDNext = throatIs.size();
+  //               auto ret =
+  //                   p2->contacts.insert(std::pair<int, int>(p1ID,
+  //                   tIDNext));
+  //               if (ret.second) {
+  //                 if (ret.second !=
+  //                     p1->contacts.insert(std::pair<int, int>(p2ID,
+  //                     tIDNext))
+  //                         .second)
+  //                   std::cout << "Errorpnm821-2 " << p1ID << " " <<
+  //                   p2ID
+  //                             << std::endl;
+  //                 throatIs.push_back(new throatNE(tIDNext, p1ID,
+  //                 p2ID));
+  //                 // if (p1ID<2 &&p2ID<2) cout <<"Errskziw3: p1ID<2
+  //                 // &&p2ID<2:
+  //                 // tid: "<< tIDNext<<endl;
+  //               }
+  //               throatNE *trot = throatIs[ret.first->second];
+  //               trot->CrosArea.z += (2 * dir - 1);
+  //               // trot->C[2] += int3{{i-1,j-1,k-1}};
+  //             }
+
+  //             if (p1ID >= firstPore)
+  //               ++(poreIs[p1ID]->surfaceArea);
+  //             if (p2ID >= firstPore)
+  //               ++(poreIs[p2ID]->surfaceArea);
+  //           }
+  //         }
+  //       }
+
+  //   (std::cout << throatIs.size() << ", ").flush();
   }
 
-  std::cout << " nThroats: " << throatIs.size() << std::endl;
+  // std::cout << " nThroats: " << throatIs.size() << std::endl;
 
   nNodes = poreIs.size();
   nTrots = throatIs.size();
@@ -557,6 +593,3 @@ void blockNetwork::createNewThroats(medialSurface *&srf) {
 
   std::cout << "." << std::endl;
 }
-
-// #include "blockNet_vxlManip.cpp"
-#include "blockNet_write_cnm.cpp"

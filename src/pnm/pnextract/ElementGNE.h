@@ -5,7 +5,7 @@
 #include <climits>
 #include <map>
 #include <iostream>
-
+#include "gtl/phmap.hpp"
 // const static int LEVEL_MAX = 32767;
 inline int nAprox(1);
 inline float _mp5(-0.5);
@@ -364,7 +364,7 @@ public:
 	int surfaceArea;
 	int volumn;
 
-	std::map<int, int> contacts;
+	gtl::flat_hash_map<int, int> contacts;
 	const medialBall *mb;
 };
 

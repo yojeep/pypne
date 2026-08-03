@@ -3,10 +3,9 @@
 #include "pypne.h"
 #include "blockNet.h"
 #include "writers.h"
+#include <Eigen/CXX11/Tensor>
 #include <cstdint>
 #include <iostream>
-#include <Eigen/CXX11/Tensor>
-
 
 
 namespace py = pybind11;
@@ -32,6 +31,18 @@ vec_str_pair convert_dict(py::dict py_dict) {
 //     return arr;
 // }
 
+inline bool writeToFile(const std::string &filename,
+                        const std::string &content) {
+  std::ofstream outFile(filename, std::ios::out);
+  if (outFile.is_open()) {
+    outFile << content;
+    outFile.close();
+    return true;
+  }
+  std::cerr << "Error: Cannot open file for writing: " << filename << std::endl;
+  return false;
+}
+
 template <typename T>
 py::array_t<T> vector_to_numpy(const std::vector<T> &vec) {
   return py::array_t<T>({vec.size()}, // shape
@@ -49,7 +60,6 @@ auto genextraction(const int nx, const int ny, const int nz,
   std::vector<uint8_t> data(static_cast<uint8_t *>(buf.ptr),
                             static_cast<uint8_t *>(buf.ptr) +
                                 buf.size * buf.itemsize);
-
 
   // Eigen::TensorMap<Eigen::Tensor<uint8_t, 3, Eigen::RowMajor>> data_tensor(
   //     static_cast<uint8_t *>(buf.ptr), nz, ny, nx);
@@ -78,8 +88,15 @@ auto genextraction(const int nx, const int ny, const int nz,
   mpn.CreateVElem(0);
 
   mpn.createNewThroats(srf);
-  if (cfg.getOr("write_Statoil", false))
-    mpn.writePNM();
+
+  auto [link1, link2, node1, node2] = get_network(mpn);
+  if (cfg.getOr("write_Statoil", false)) {
+    writeToFile((cfg.name() + "_link1.dat"), link1);
+    writeToFile((cfg.name() + "_link2.dat"), link2);
+    writeToFile((cfg.name() + "_node1.dat"), node1);
+    writeToFile((cfg.name() + "_node2.dat"), node2);
+  }
+  // mpn.writePNM();
 
   if (cfg.getOr("write_hierarchy", false))
     vtuWriteMbMbs(cfg.name() + "_mbHierarchy" + _s(0), srf->ballSpace,
@@ -146,7 +163,6 @@ auto genextraction(const int nx, const int ny, const int nz,
   auto VElems = mpn.VElems.data_;
   py::array_t<int> py_VElems = vector_to_numpy<int>(VElems);
 
-  auto [link1, link2, node1, node2] = compute_PYPNEData_string(mpn);
   py::dict pn("link1"_a = link1, "link2"_a = link2, "node1"_a = node1,
               "node2"_a = node2);
   py::dict pyres("VElems"_a = py_VElems, "pn"_a = pn);

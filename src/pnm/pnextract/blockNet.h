@@ -30,7 +30,7 @@ public:
   void createThroatBallConnectivity(medialSurface *&srf);
   void createCornerHirarchy();
 
-  void writePNM() const;
+  // void writePNM() const;
 
   static int SideImax;
   static int nBP6; // 1+SideImax
