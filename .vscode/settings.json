@@ -138,6 +138,10 @@
     },
     "search.exclude": {
         "**/build": true,
-        "*/cmake-build-": true
-    }
+        "*/cmake-build-": true,
+        "**/deprecated": true,
+    },
+    "clangd.arguments": [
+        "--compile-commands-dir=build",
+    ]
 }

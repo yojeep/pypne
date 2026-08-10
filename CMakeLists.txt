@@ -43,24 +43,19 @@
 # install(TARGETS pypne_cpp LIBRARY DESTINATION pypne/libcpp)
 
 
-
-
-
-
 cmake_minimum_required(VERSION 4.2)
 project(pypne_project LANGUAGES CXX)
 
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_COMPILER "g++")
+# set(CMAKE_CXX_COMPILER "C:/Mingw64/w64devkit/bin/g++.exe")
+# set(CMAKE_CXX_COMPILER "clang++")
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(BUILD_CORE "Build core library" ON)
 option(BUILD_PYTHON "Build pybind11 Python module" ON)
-option(BUILD_TESTS  "Build test executables"       OFF)
-
-
-
 
 add_subdirectory(src)
 
@@ -70,8 +65,5 @@ if(BUILD_PYTHON)
     add_subdirectory(python)
 endif()
 
-if(BUILD_TESTS)
-    add_subdirectory(tests)
-endif()
 
-
+# add_subdirectory(tests/bit_vector)

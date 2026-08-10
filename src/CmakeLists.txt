@@ -1,31 +1,25 @@
-add_library(voxel STATIC
-    ${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel/voxelImage.cpp
-)
-target_include_directories(voxel PUBLIC
-    ${CMAKE_SOURCE_DIR}/thirdparty/system
-    ${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel
-    
-)
-target_include_directories(voxel PUBLIC
-    ${CMAKE_SOURCE_DIR}/src/include
-    ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1
-    ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1/unsupported
-)
+set(pybind11_DIR ${CMAKE_SOURCE_DIR}/thirdparty/system/pybind11/share/cmake/pybind11)
+find_package(pybind11 REQUIRED)
+
+
 
 add_library(pypne_core STATIC
-    pnm/pnextract/blockNet.cpp
-    pnm/pnextract/medialSurf.cpp
-    pnm/pnextract/writers_vtk.cpp
-    pnm/pnextract/writers_vxl.cpp
+    pnextract/blockNet.cpp
+    pnextract/medialSurf.cpp
+    pnextract/pypne.cpp
 )
 
+target_link_libraries(pypne_core 
+    PUBLIC
+    pybind11::module  
+)
 target_include_directories(pypne_core
-    PUBLIC  ${CMAKE_SOURCE_DIR}/src/include
     PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system
-    PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system/libvoxel
+    PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1
+    PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system/eigen-5.0.1/unsupported
+    PUBLIC  ${CMAKE_SOURCE_DIR}/thirdparty/system/sdsl-lite-3.0.4/include
 )
 
-target_link_libraries(pypne_core PUBLIC voxel)
 target_compile_definitions(pypne_core PRIVATE BOOST_DISABLE_ASSERTS)
 
 

@@ -1,0 +1,5 @@
+CompileFlags:
+  Compiler: C:\Mingw64\w64devkit\bin\g++.exe
+  Add:
+  - --target=x86_64-w64-mingw32
+  - --query-driver=C:\Mingw64\w64devkit\bin\g++.exe

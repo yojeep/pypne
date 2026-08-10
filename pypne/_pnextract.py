@@ -1,3 +1,5 @@
+from dataclasses import asdict, dataclass, field
+from typing import Optional
 import numpy as np
 from pathlib import Path
 import os
@@ -5,6 +7,31 @@ import sys
 from io import StringIO
 from contextlib import contextmanager, nullcontext, redirect_stdout
 from .libcpp import pypne_cpp
+
+
+@dataclass
+class PnConfig:
+    # 结构定义与默认值在同一个地方，一目了然
+    write_Statoil: bool = False
+    write_elements: bool = False
+    write_all: bool = False
+    output_path: Path = field(default_factory=lambda: Path.cwd())
+    name: str = "pn"
+    minRp: Optional[float] = None
+    nBP6: int = 2
+    clipROutx: Optional[int] = None
+    clipROutyz: Optional[int] = None
+    midRf: Optional[float] = None
+    MSNoise: Optional[float] = None
+    lenNf: Optional[int] = None
+    vmvRadRelNf: Optional[float] = None
+    nRSmoothing: Optional[int] = None
+    RCorsnf: Optional[float] = None
+    RCorsn: Optional[float] = None
+
+
+# 使用时极其清爽，不需要重复写一堆键名
+cfg = PnConfig()
 
 
 @contextmanager
@@ -21,26 +48,13 @@ def suppress_stdout():
         os.close(saved)
 
 
-_true_set = {"yes", "true", "t", "y", "1"}
-_false_set = {"no", "false", "f", "n", "0"}
-
-
-def str2bool(value, raise_exc=False):
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        value = value.lower()
-        if value in _true_set:
-            return True
-        if value in _false_set:
-            return False
-
-    if raise_exc:
-        raise ValueError('Expected "%s"' % '", "'.join(_true_set | _false_set))
-    return None
-
-
-def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_workers=1):
+def pnextract(
+    image,
+    resolution=1.0,
+    config_settings=None,
+    verbose=False,
+    n_workers=1,
+):
     """
     image : 3D numpy array of binary image data,0 is the value to be extracted
     resolution : resolution of the image, default is 1.0
@@ -73,80 +87,54 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
 
     config_settings: a dictionary containing the following keys:
     write_Statoil:false,
-    write_radius:false,
     write_elements:false,
-    write_hierarchy:false,
-    write_throatHierarchy:false,
-    write_vtkNetwork:false,
-    write_throats:false,
-    write_poreMaxBalls:false,
-    write_throatMaxBalls:false,
-
+    write_all:false,
+    minRp: minimum radius of pore, using default value _minRp=min(1.25, avgR*0.25)+0.5
+    clipROutx=0.05;
+    clipROutyz=0.98;
+    midRf=0.7;
+    MSNoise=1.*abs(_minRp)+1.;
+    lenNf=0.6;
+    vmvRadRelNf=1.1;
+    nRSmoothing=3;
+    RCorsnf=0.15;
+    RCorsn=abs(_minRp);
     output_path : path to output file, using default value "./pn(with desired suffix)"
-
-    minRPore: minimum radius of pore, using default value _minRp=min(1.25, avgR*0.25)+0.5
-
-    medialSurfaceSettings: medial surface settings, using the following default values:
-        _clipROutx=0.05;
-        _clipROutyz=0.98;
-        _midRf=0.7;
-        _MSNoise=1.*abs(_minRp)+1.;
-        _lenNf=0.6;
-        _vmvRadRelNf=1.1;
-        _nRSmoothing=3;
-        _RCorsnf=0.15;
-        _RCorsn=abs(_minRp);
-
-    If you wants to set medialSurfaceSettings, you should use config_settings like this:
-    config_settings['medialSurfaceSettings'] = "_clipROutx _clipROutyz _midRf _MSNoise _lenNf _vmvRadRelNf _nRSmoothing _RCorsnf _RCorsn"
-    change the arguments to values you want.
     """
-    Path_cwd = Path.cwd()
-    cfg = {
-        "write_Statoil": False,
-        "write_radius": False,
-        "write_elements": False,
-        "write_hierarchy": False,
-        "write_throatHierarchy": False,
-        "write_vtkNetwork": False,
-        "write_throats": False,
-        "write_poreMaxBalls": False,
-        "write_throatMaxBalls": False,
-        "write_all": False,
-        "output_path": Path_cwd.resolve(),
-        "name": "pn",
-        "minRPore": None,
-        "medialSurfaceSettings": None,
-    }
+    cfg = asdict(PnConfig())
 
     if config_settings:
+        unsupported_keys = config_settings.keys() - cfg.keys()
+        if unsupported_keys:
+            raise ValueError(
+                f"Unsupported keys: {unsupported_keys}, supported keys are {set(cfg.keys())}"
+            )
         cfg.update(config_settings)
-    cfg = {str(k): str(v) for k, v in cfg.items() if v is not None}
 
-    if cfg["output_path"] is not None:
-        cfg["output_path"] = Path(cfg["output_path"]).resolve()
-
-    if str2bool(cfg["write_all"]):
+    if cfg["write_all"]:
         for k in cfg:
             if k.startswith("write_"):
-                cfg[k] = "true"
+                cfg[k] = True
 
-    need_write = any(str2bool(v) for k, v in cfg.items() if k.startswith("write_"))
-    if need_write:
+    if any(v for k, v in cfg.items() if k.startswith("write_")):
+        cfg["output_path"] = Path(cfg["output_path"]).resolve()
         Path(cfg["output_path"]).mkdir(parents=True, exist_ok=True)
-        cfg["output_path"] = str(Path(cfg["output_path"]) / cfg["name"])
+        cfg["output_path"] = Path(cfg["output_path"]) / cfg["name"]
+    cfg["output_path"] = str(cfg["output_path"])
 
-    cfg.pop("name", None)
-    if not need_write:
-        cfg.pop("output_path", None)
-    image = image.astype(np.uint8, copy=False)
+    image = image.astype(bool, copy=False)
     nz, ny, nx = image.shape
     # 直接根据 verbose 决定是否使用 suppress_stdout
-    n_workers = os.cpu_count() if n_workers <= 0 else min(n_workers, os.cpu_count())
+    n_workers = (
+        os.cpu_count() + 1 + n_workers
+        if n_workers < 0
+        else max(1, min(n_workers, os.cpu_count()))
+    )
     with suppress_stdout() if not verbose else nullcontext():
         res = pypne_cpp.pnextract(
-            nx, ny, nz, resolution, image.reshape(-1), cfg.copy(), n_workers
+            nz, ny, nx, resolution, image.reshape(-1), cfg, n_workers
         )
+
     image_VElems = res["VElems"].reshape(nz + 2, ny + 2, nx + 2)
     pn = res["pn"]
     link1 = pn["link1"]
@@ -232,7 +220,7 @@ def pnextract(image, resolution=1.0, config_settings=None, verbose=False, n_work
     pn["throat.volume"] = link2_arr["throat_volume"]
     pn["throat.clay_volume"] = link2_arr["throat_clay_volume"]
 
-    if str2bool(cfg["write_elements"]):
+    if cfg["write_elements"]:
         image_VElems.astype(np.int32, copy=False).tofile(
             f"{cfg['output_path']}_VElems_{image_VElems.shape[2]}x{image_VElems.shape[1]}x{image_VElems.shape[0]}_s32_le.raw"
         )
