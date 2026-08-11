@@ -134,7 +134,7 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included
                   continue;
                 voxel &v = vxlMap(z, y, x);
                 float r = v.R;
-                if (r <= max_r && r <= _minRp)
+                if (r <= max_r || r <= _minRp)
                   continue;
                 max_r = r;
                 max_voxel = &v;
@@ -489,7 +489,7 @@ void medialSurface::findBoss(medialBall *bi) {
 float medialSurface::calc_distmaps() // search  MBs at each voxel
 {
 
-  std::cout << " computing distance map for index " << int(0);
+  std::cout << " computing distance map for index 1" << std::endl;
   std::cout.flush();
 
   std::unique_ptr<float[]> dt2 = edt::binary_edtsq(
