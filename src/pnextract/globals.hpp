@@ -3,7 +3,10 @@
 #include <memory>
 #include <thread_pool/BS_thread_pool.hpp>
 #include <Eigen/CXX11/Tensor>
+
 inline int num_workers(1);
+inline constexpr float _0p5(0.5);
+
 class GlobalThreadPool {
 private:
   // 使用 inline 让静态变量可在头文件中定义
@@ -39,47 +42,36 @@ template <typename T> inline T norm(T x, T y, T z) noexcept {
   return std::sqrt(norm_sq(x, y, z));
 }
 
-template <typename Func>
-inline void for_each_voxel_in_sphere_delta(int cz, int cy, int cx, float radius,
-                                           int nz, int ny, int nx,
-                                           Func &&func) noexcept {
-  float r2 = radius * radius;
-  int z_start = std::max(static_cast<int>(std::ceil(cz - radius)), 0);
-  int z_end = std::min(static_cast<int>(std::floor(cz + radius)) + 1, nz);
+template <typename Func, typename Tc, typename Tr>
+inline void for_each_voxel_in_sphere(Tc zc, Tc yc, Tc xc, Tr radius, int nz,
+                                     int ny, int nx, Func &&func) noexcept {
+  Tr r2 = radius * radius;
+  int z_start = std::max(static_cast<int>(std::ceil(zc - radius)), 0);
+  int z_end = std::min(static_cast<int>(std::floor(zc + radius)) + 1, nz);
 
   for (int z = z_start; z < z_end; ++z) {
-    float dz = z - cz;
-    float ry2 = r2 - sq(dz);
+    Tr dz = z - zc;
+    Tr ry2 = r2 - sq(dz);
     if (ry2 <= 0)
       continue;
-    float ry = std::sqrtf(ry2);
+    Tr yr = std::sqrt(ry2);
 
-    int y_start = std::max(static_cast<int>(std::ceil(cy - ry)), 0);
-    int y_end = std::min(static_cast<int>(std::floor(cy + ry)) + 1, ny);
+    int y_start = std::max(static_cast<int>(std::ceil(yc - yr)), 0);
+    int y_end = std::min(static_cast<int>(std::floor(yc + yr)) + 1, ny);
 
     for (int y = y_start; y < y_end; ++y) {
-      float dy = y - cy;
-      float rx2 = ry2 - sq(dy);
+      Tr dy = y - yc;
+      Tr rx2 = ry2 - sq(dy);
       if (rx2 <= 0)
         continue;
-      float rx = std::sqrtf(rx2);
+      Tr xr = std::sqrt(rx2);
 
-      int x_start = std::max(static_cast<int>(std::ceil(cx - rx)), 0);
-      int x_end = std::min(static_cast<int>(std::floor(cx + rx)) + 1, nx);
+      int x_start = std::max(static_cast<int>(std::ceil(xc - xr)), 0);
+      int x_end = std::min(static_cast<int>(std::floor(xc + xr)) + 1, nx);
 
       for (int x = x_start; x < x_end; ++x) {
-        float dx = x - cx;
-        func(z, y, x, dz, dy, dx);
+        func(z, y, x);
       }
     }
   }
-}
-
-template <typename Func>
-inline void for_each_voxel_in_sphere(int cz, int cy, int cx, float radius,
-                                     int nz, int ny, int nx,
-                                     Func &&func) noexcept {
-  for_each_voxel_in_sphere_delta(
-      cz, cy, cx, radius, nz, ny, nx,
-      [&func](int z, int y, int x, float, float, float) { func(z, y, x); });
 }

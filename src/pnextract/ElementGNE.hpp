@@ -1,9 +1,9 @@
 #pragma once
+#include "globals.hpp"
 #include "gtl/phmap.hpp"
 #include "types.hpp"
 
 inline int nAprox(1);
-inline constexpr float _mp5(-0.5);
 class medialBall;
 
 class voxel {
@@ -36,7 +36,7 @@ public:
       : fz(-10000.0f), fy(-0.5f), fx(-10000.0f), R(-10000.0f), boss(this),
         vxl(nullptr), corId(0), type(t) {}
   medialBall(voxel *v, short t)
-      : fz(v->z - _mp5), fy(v->y - _mp5), fx(v->x - _mp5), R(v->R), boss(this),
+      : fz(v->z + _0p5), fy(v->y + _0p5), fx(v->x + _0p5), R(v->R), boss(this),
         vxl(v), corId(0), type(t) {}
   ~medialBall() {}
 
@@ -158,27 +158,26 @@ public:
   }
   const medialBall *mb22() const { return toxels2.front()->ball; }
 
-
   // dbl3 CrosArea;
   Vector3f32 CrosArea;
   // int3x3 C;
 };
 
-inline float distSqr(const medialBall *i, const medialBall *j) {
+inline float distSq(const medialBall *i, const medialBall *j) {
   const float dz = i->fz - j->fz;
   const float dy = i->fy - j->fy;
   const float dx = i->fx - j->fx;
   return dz * dz + dy * dy + dx * dx;
 }
 
-inline float distSqr(const medialBall &i, const medialBall &j) {
+inline float distSq(const medialBall &i, const medialBall &j) {
   const float dz = i.fz - j.fz;
   const float dy = i.fy - j.fy;
   const float dx = i.fx - j.fx;
   return dz * dz + dy * dy + dx * dx;
 }
 
-inline float distSqr(const voxel &i, const voxel &j) {
+inline float distSq(const voxel &i, const voxel &j) {
   const int dx = i.x - j.x;
   const int dy = i.y - j.y;
   const int dz = i.z - j.z;

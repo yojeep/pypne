@@ -133,12 +133,13 @@ void medialSurface::paradox_pre_removeincludedballI() // to remove the included
                 if (!bool_img.isinside(z, y, x) || !bool_img(z, y, x))
                   continue;
                 voxel &v = vxlMap(z, y, x);
-                float v_r = v.R;
-                if (v_r > max_r && v_r > _minRp) {
-                  max_r = v_r;
-                  max_voxel = &v;
-                }
+                float r = v.R;
+                if (r <= max_r && r <= _minRp)
+                  continue;
+                max_r = r;
+                max_voxel = &v;
               }
+
           if (max_voxel != nullptr) {
             max_voxel->ball = &ToBeAssigned;
             _nBalls.fetch_add(1, std::memory_order_relaxed);
@@ -177,14 +178,13 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
     if (!vi->ball)
       continue;
 
-    int zo = vi->z, yo = vi->y, xo = vi->x;
     float ri = vi->R;
-    float ripinc = ri + 0.55f;
+    float r_sphere = ri + 0.55f;
     float mbmbDist = _RCorsnf * ri + _RCorsn;
+    int iz = vi->z, iy = vi->y, ix = vi->x;
 
-    for_each_voxel_in_sphere_delta(
-        zo, yo, xo, ripinc, nz, ny, nx,
-        [&](int z, int y, int x, float dz, float dy, float dx) noexcept {
+    for_each_voxel_in_sphere(
+        iz, iy, ix, r_sphere, nz, ny, nx, [&](int z, int y, int x) noexcept {
           if (!bool_img(z, y, x))
             return;
           voxel &vj = vxlMap(z, y, x);
@@ -192,11 +192,12 @@ void medialSurface::paradoxremoveincludedballI() { /// Remove included balls.
             return;
           float rj = vj.R;
           if (rj <= ri) {
+            float dz = z - iz, dy = y - iy, dx = x - ix;
             float D = norm(dz, dy, dx);
-            if (D < mbmbDist || (D + rj < ripinc + _MSNoise)) {
-              vj.ball = nullptr;
-              ++ndel;
-            }
+            if (D >= mbmbDist && (D + rj >= r_sphere + _MSNoise))
+              return;
+            vj.ball = nullptr;
+            ++ndel;
           }
         });
 
@@ -239,7 +240,7 @@ void medialSurface::moveUphill(medialBall &bi) {
     if (std::abs(denom) < 0.01f)
       continue;
 
-    disp[a] = std::clamp(-0.5 * (gp + gm) / denom, -0.49, 0.49);
+    disp[a] = std::clamp(-0.5f * (gp + gm) / denom, -0.49f, 0.49f);
   }
 
   if (bi.boss != &bi) {
@@ -249,9 +250,9 @@ void medialSurface::moveUphill(medialBall &bi) {
     disp -= 0.95f * (BosKidVec.dot(disp) / sqNorm) * BosKidVec;
   }
 
-  bi.fx = vi.x - _mp5 + disp[0];
-  bi.fy = vi.y - _mp5 + disp[1];
-  bi.fz = vi.z - _mp5 + disp[2];
+  bi.fx = vi.x + _0p5 + disp[0];
+  bi.fy = vi.y + _0p5 + disp[1];
+  bi.fz = vi.z + _0p5 + disp[2];
   bi.R = vi.R + 0.95f * disp.norm();
 }
 
@@ -287,7 +288,7 @@ void medialSurface::moveUphillp1(medialBall &bi) {
 
     if (std::abs(denom) < 0.01f)
       continue;
-    disp[a] = std::clamp(-0.5 * sum / denom, -0.59, 0.59);
+    disp[a] = std::clamp(-0.5f * sum / denom, -0.59f, 0.59f);
   }
 
   disp += 1.4f * grad;
@@ -309,42 +310,49 @@ void medialSurface::moveUphillp1(medialBall &bi) {
     return;
   }
   voxel &vj = vxlMap(iz_vj, iy_vj, ix_vj);
-  if (vj && &vi != &vj && vj.R > vi.R && vj.ball == nullptr) {
-    bi.vxl->ball = nullptr;
-    bi.vxl = &vj;
-    bi.fx = vj.x - _mp5;
-    bi.fy = vj.y - _mp5;
-    bi.fz = vj.z - _mp5;
-    bi.R = vj.R;
-    vj.ball = &bi;
-  }
+  if (&vi == &vj || vj.R <= vi.R || vj.ball != nullptr)
+    return;
+  bi.vxl->ball = nullptr;
+  bi.vxl = &vj;
+  bi.fx = vj.x + _0p5;
+  bi.fy = vj.y + _0p5;
+  bi.fz = vj.z + _0p5;
+  bi.R = vj.R;
+  vj.ball = &bi;
 }
 
 void medialSurface::competeForParent(medialBall *bi, medialBall *bj) {
+
+  auto ratioBoss = [](float bossR, float selfR, float d, float n) noexcept {
+    return (bossR - selfR + 2.0f * n) / (d + 0.25f);
+  };
+  auto ratioPeer = [](float otherR, float selfR, float d, float n) noexcept {
+    return (otherR - selfR + 2.0f * n + 0.01f) / (d + 0.2f);
+  };
+  auto ratioNear = [](float bossR, float selfR, float d, float n,
+                      float off) noexcept {
+    return (bossR - selfR + 2.0f * n) / (d + off);
+  };
+
   const float noise = _MSNoise;
   const float ri = bi->R;
   const float rj = bj->R;
-  const float riSqr = ri * ri;
-  const float rjSqr = rj * rj;
-  const float dSqr = distSqr(bi, bj);
-  const float dVal = std::sqrt(dSqr);
+  const float riSq = ri * ri;
+  const float rjSq = rj * rj;
+  const float dSq = distSq(bi, bj);
+  const float dSqrt = std::sqrt(dSq);
 
   // Calculate weighted middle voxel
-  const float wsinv = 1.0f / (riSqr + rjSqr);
-  int iz_middle = wsinv * (bi->fz * rjSqr + bj->fz * riSqr),
-      iy_middle = wsinv * (bi->fy * rjSqr + bj->fy * riSqr),
-      ix_middle = wsinv * (bi->fx * rjSqr + bj->fx * riSqr);
+  const float wsinv = 1.0f / (riSq + rjSq);
+  int iz_middle = wsinv * (bi->fz * rjSq + bj->fz * riSq),
+      iy_middle = wsinv * (bi->fy * rjSq + bj->fy * riSq),
+      ix_middle = wsinv * (bi->fx * rjSq + bj->fx * riSq);
 
   if (!vxlMap.isinside(iz_middle, iy_middle, ix_middle))
     return;
   const voxel &middlevxl = vxlMap(iz_middle, iy_middle, ix_middle);
-  if (!middlevxl)
-    return;
-
-  const float minR = std::min(ri, rj);
-  if (middlevxl.R < minR * _midRf - 0.5f)
-    return;
-  if (1.01 * dVal > ri + rj + 1.0f + noise)
+  if (!middlevxl || middlevxl.R < std::min(ri, rj) * _midRf - 0.5f ||
+      1.01 * dSqrt > ri + rj + 1.0f + noise)
     return;
 
   // Initialize Boss assignment
@@ -371,40 +379,26 @@ void medialSurface::competeForParent(medialBall *bi, medialBall *bj) {
     return;
 
   if (mbi == mbj) {
-    const int leveli = bi->level();
-    const int levelj = bj->level();
-    const int levelDiff = leveli - levelj;
+    {
+      const int leveli = bi->level();
+      const int levelj = bj->level();
+      const int levelDiff = leveli - levelj;
 
-    const float distBiBoss = dist(bi->boss, bi);
-    const float distBjBoss = dist(bj->boss, bj);
-    const float distBiBj = dist(bi, bj);
+      const float distBiBoss = dist(bi->boss, bi);
+      const float distBjBoss = dist(bj->boss, bj);
+      const float distBiBj = dSqrt;
 
-    auto ratioBoss = [](float bossR, float selfR, float d, float n) noexcept {
-      return (bossR - selfR + 2.0f * n) / (d + 0.25f);
-    };
-    auto ratioPeer = [](float otherR, float selfR, float d, float n) noexcept {
-      return (otherR - selfR + 2.0f * n + 0.01f) / (d + 0.2f);
-    };
-
-    if (levelDiff < -1) {
-      if (ratioBoss(bj->boss->R, bj->R, distBjBoss, noise) <
-          ratioPeer(bi->R, bj->R, distBiBj, noise))
+      if (levelDiff < -1 && ratioBoss(bj->boss->R, bj->R, distBjBoss, noise) <
+                                ratioPeer(bi->R, bj->R, distBiBj, noise))
         bj->boss = bi;
-    } else if (levelDiff > 1) {
-      if (ratioBoss(bi->boss->R, bi->R, distBiBoss, noise) <
-          ratioPeer(bj->R, bi->R, distBiBj, noise))
+      else if (levelDiff > 1 &&
+               ratioBoss(bi->boss->R, bi->R, distBiBoss, noise) <
+                   ratioPeer(bj->R, bi->R, distBiBj, noise))
         bi->boss = bj;
-    } else {
-
-      auto ratioNear = [](float bossR, float selfR, float d, float n,
-                          float off) noexcept {
-        return (bossR - selfR + 2.0f * n) / (d + off);
-      };
-
-      if (levelDiff > 0 &&
-          ratioNear(bi->boss->R, bi->R, distBiBoss, noise, 1.2f) <
-              ratioNear(bj->R, bi->R, distBiBj, noise, 1.3f) &&
-          !bj->inParents(bi))
+      else if (levelDiff > 0 &&
+               ratioNear(bi->boss->R, bi->R, distBiBoss, noise, 1.2f) <
+                   ratioNear(bj->R, bi->R, distBiBj, noise, 1.3f) &&
+               !bj->inParents(bi))
         bi->boss = bj;
       else if (levelDiff < 0 &&
                ratioNear(bj->boss->R, bj->R, distBjBoss, noise, 1.2f) <
@@ -418,7 +412,7 @@ void medialSurface::competeForParent(medialBall *bi, medialBall *bj) {
     }
   } else { // mvi != mvj: Merge different master balls
     const float avgR = 0.5f * (mbi->R + mbj->R);
-    if (distSqr(mbi, mbj) < _lenNf * std::pow(avgR + 2.0f * noise, 2)) {
+    if (distSq(mbi, mbj) < _lenNf * sq(avgR + 2.0f * noise)) {
       // Ensure mvi is the larger one
       if (mbi->R < mbj->R) {
         std::swap(bi, bj);
@@ -479,9 +473,9 @@ void medialSurface::competeForParent(medialBall *bi, medialBall *bj) {
 void medialSurface::findBoss(medialBall *bi) {
 
   float zo = bi->fz, yo = bi->fy, xo = bi->fx;
-  float ripp = bi->R * 0.6f + 2.0f * _MSNoise + 2.0f;
+  float r_sphere = bi->R * 0.6f + 2.0f * _MSNoise + 2.0f;
 
-  for_each_voxel_in_sphere(zo, yo, xo, ripp, nz, ny, nx,
+  for_each_voxel_in_sphere(zo, yo, xo, r_sphere, nz, ny, nx,
                            [&](int z, int y, int x) noexcept {
                              if (!bool_img(z, y, x))
                                return;
@@ -600,9 +594,9 @@ void medialSurface::smoothRadius() {
                 sumDelR += delRrr(z, y, x);
                 ++counter;
               }
-          vi.R += std::clamp(0.02 * (delRrr(zo, yo, xo) -
-                                     0.99 * 2. * sumDelR / (counter + 27)),
-                             -0.005, 0.01);
+          vi.R += std::clamp(0.02f * (delRrr(zo, yo, xo) -
+                                      0.99f * 2.0f * sumDelR / (counter + 27)),
+                             -0.005f, 0.01f);
         }
       });
   pool.wait();

@@ -111,35 +111,38 @@ void blockNetwork::CreateVElem() { /// ### map pore labels from maximal spheres
 
       float rbi = bi.R;
       float r = std::max(rbi * 0.25f - 1.0f, 1.001f);
-      for_each_voxel_in_sphere(
-          bi.fz, bi.fy, bi.fx, r, cfg.nz, cfg.ny, cfg.nx,
-          [&](int z, int y, int x) {
-            if (!bool_img(z, y, x))
-              return;
-            int zVE = z + 1;
-            int yVE = y + 1;
-            int xVE = x + 1;
-            int Vn = VElems(zVE, yVE, xVE);
-            if (Vn == Vm)
-              return;
-            if (Vn == unassigned) {
-              VElems(zVE, yVE, xVE) = Vm;
-              return;
-            }
+      for_each_voxel_in_sphere(bi.fz, bi.fy, bi.fx, r, cfg.nz, cfg.ny, cfg.nx,
+                               [&](int z, int y, int x) {
+                                 if (!bool_img(z, y, x))
+                                   return;
+                                 int zVE = z + 1;
+                                 int yVE = y + 1;
+                                 int xVE = x + 1;
+                                 int Vn = VElems(zVE, yVE, xVE);
+                                 if (Vn == unassigned) {
+                                   VElems(zVE, yVE, xVE) = Vm;
+                                   return;
+                                 }
 
-            const voxel &vn = vxlMap(z, y, x);
-            if (vn.ball || vn.R >= rbi)
-              return;
-            const medialBall *bn = poreIs[Vn].mb;
+                                 if (Vn == Vm)
+                                   return;
 
-            Vector3f32 fdold{x - bn->fx, y - bn->fy, z - bn->fz};
-            Vector3f32 fdnew{x - mastrSphere->fx, y - mastrSphere->fy,
-                             z - mastrSphere->fz};
-                             
-            if (fdnew.squaredNorm() >= fdold.squaredNorm())
-              return;
-            VElems(zVE, yVE, xVE) = Vm;
-          });
+                                 const voxel &vn = vxlMap(z, y, x);
+                                 if (vn.ball || vn.R >= rbi)
+                                   return;
+                                 const medialBall *bn = poreIs[Vn].mb;
+
+                                 Vector3f32 fdold{x + _0p5 - bn->fx,
+                                                  y + _0p5 - bn->fy,
+                                                  z + _0p5 - bn->fz};
+                                 Vector3f32 fdnew{x + _0p5 - mastrSphere->fx,
+                                                  y + _0p5 - mastrSphere->fy,
+                                                  z + _0p5 - mastrSphere->fz};
+
+                                 if (fdnew.squaredNorm() >= fdold.squaredNorm())
+                                   return;
+                                 VElems(zVE, yVE, xVE) = Vm;
+                               });
     }
 
     std::cout << "\n growing pores, ..  ";
@@ -251,7 +254,9 @@ void blockNetwork::createNewThroats() {
         throatIs.begin(), throatIs.end(), [](const auto &a, const auto &b) {
           return a.e1 < b.e1 || (a.e1 == b.e1 && a.e2 < b.e2);
         });
-    for (int tid = 0; tid < throatIs.size(); ++tid) {
+
+    
+    for (size_t tid = 0; tid < throatIs.size(); ++tid) {
       throatNE &elemt = throatIs[tid];
       elemt.tid = tid;
       poreNE &elemp1 = poreIs[elemt.e1];

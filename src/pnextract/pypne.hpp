@@ -35,8 +35,6 @@ inline bool writeToFile(const std::string &filename,
   return false;
 }
 
-// #include <format>
-
 inline double
 randomG() /// to randomly distribute the shape factors, in case of errors
 {

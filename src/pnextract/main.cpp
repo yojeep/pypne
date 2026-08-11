@@ -36,7 +36,6 @@ auto genextraction(const int &nz, const int &ny, const int &nx,
   mpn.srf.createBallsAndHierarchy();
   mpn.CreateVElem();
   mpn.createNewThroats();
-  const medialSurface &srf = mpn.srf;
 
   auto [link1, link2, node1, node2] = get_network(mpn);
   if (cfg.write_Statoil) {
