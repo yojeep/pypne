@@ -110,37 +110,39 @@ void blockNetwork::CreateVElem() { /// ### map pore labels from maximal spheres
       int Vm = VElems(izm, iym, ixm);
 
       float rbi = bi.R;
-      float r = std::max(rbi * 0.25f - 1.0f, 1.001f);
-      for_each_voxel_in_sphere(
-          bi.fz, bi.fy, bi.fx, r, cfg.nz, cfg.ny, cfg.nx,
-          [&](int z, int y, int x) {
-            if (!bool_img(z, y, x))
-              return;
-            int zVE = z + 1;
-            int yVE = y + 1;
-            int xVE = x + 1;
-            int Vn = VElems(zVE, yVE, xVE);
-            if (Vn == unassigned) {
-              VElems(zVE, yVE, xVE) = Vm;
-              return;
-            }
+      float r = std::max(rbi * 0.5f - 1.0f, 1.001f);
+      for_each_voxel_in_sphere(bi.fz, bi.fy, bi.fx, r, cfg.nz, cfg.ny, cfg.nx,
+                               [&](int z, int y, int x) {
+                                 if (!bool_img(z, y, x))
+                                   return;
+                                 int zVE = z + 1;
+                                 int yVE = y + 1;
+                                 int xVE = x + 1;
+                                 int Vn = VElems(zVE, yVE, xVE);
+                                 if (Vn == unassigned) {
+                                   VElems(zVE, yVE, xVE) = Vm;
+                                   return;
+                                 }
 
-            if (Vn == Vm)
-              return;
+                                 if (Vn == Vm)
+                                   return;
 
-            const voxel &vn = vxlMap(z, y, x);
-            if (vn.ball || vn.R >= rbi)
-              return;
-            const medialBall *bn = poreIs[Vn].mb;
+                                 const voxel &vn = vxlMap(z, y, x);
+                                 if (vn.ball || vn.R >= rbi)
+                                   return;
 
-            float dold = sq(x - bn->fx) + sq(y - bn->fy) + sq(z - bn->fz);
-            float dnew = sq(x - mastrSphere->fx) + sq(y - mastrSphere->fy) +
-                         sq(z - mastrSphere->fz);
+                                 const medialBall *bn = poreIs[Vn].mb;
+                                 float dold = sq(x + 0.5f - bn->fx) +
+                                              sq(y + 0.5f - bn->fy) +
+                                              sq(z + 0.5f - bn->fz);
+                                 float dnew = sq(x + 0.5f - mastrSphere->fx) +
+                                              sq(y + 0.5f - mastrSphere->fy) +
+                                              sq(z + 0.5f - mastrSphere->fz);
 
-            if (dnew >= dold)
-              return;
-            VElems(zVE, yVE, xVE) = Vm;
-          });
+                                 if (dnew >= dold)
+                                   return;
+                                 VElems(zVE, yVE, xVE) = Vm;
+                               });
     }
 
     std::cout << "\n growing pores, ..  ";

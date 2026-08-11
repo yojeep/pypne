@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include "medialSurf.hpp"
+#include "ElementGNE.hpp"
 #include "edt_float_bv.hpp"
 #include "globals.hpp"
 #include "indexunraveler.hpp"
@@ -637,24 +638,12 @@ void medialSurface::createBallsAndHierarchy() { /// Create distance map,
 
   std::cout << " collecting maximal balls out of " << nBalls << std::endl;
 
-  std::vector<voxel *> tvs;
-  tvs.reserve(nBalls);
-
-  for (voxel &v : vxlMap.vec_data_) {
-    if (v.ball) {
-      tvs.push_back(&v);
-    }
-  }
-
-  boost::sort::sample_sort(
-      tvs.begin(), tvs.end(),
-      [](const voxel *a, const voxel *b) { return a->R > b->R; }, num_workers);
-  std::cout << " sorting " << int(tvs.size()) << " maximal balls" << std::endl;
-
   ballSpace.reserve(nBalls);
-  for (voxel *v : tvs) {
-    ballSpace.emplace_back(v, 0);
-    v->ball = &ballSpace.back();
+  for (voxel &v : vxlMap.vec_data_) {
+    if (!v.ball)
+      continue;
+    ballSpace.emplace_back(&v, 0);
+    v.ball = &ballSpace.back();
   }
   std::cout << "  number of maximal balls: " << nBalls << std::endl;
 
@@ -667,6 +656,16 @@ void medialSurface::createBallsAndHierarchy() { /// Create distance map,
 
   pool.wait();
   std::cout << "moveUphill done" << std::endl;
+
+  boost::sort::sample_sort(
+      ballSpace.begin(), ballSpace.end(),
+      [](const medialBall &a, const medialBall &b) { return a.R > b.R; },
+      num_workers);
+
+  for (medialBall &b : ballSpace) {
+    b.boss = &b;
+    b.vxl->ball = &b;
+  }
 
   for (size_t i = 0; i < nBalls; ++i) {
     moveUphillp1(ballSpace[i]);
@@ -681,6 +680,16 @@ void medialSurface::createBallsAndHierarchy() { /// Create distance map,
                      });
 
   pool.wait();
+
+  boost::sort::sample_sort(
+      ballSpace.begin(), ballSpace.end(),
+      [](const medialBall &a, const medialBall &b) { return a.R > b.R; },
+      num_workers);
+
+  for (medialBall &b : ballSpace) {
+    b.boss = &b;
+    b.vxl->ball = &b;
+  }
 
   std::cout << " creating ball hierarchy:";
   std::cout.flush();

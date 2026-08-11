@@ -98,7 +98,7 @@ get_network(blockNetwork &bn) {
 
     if (t_shapeFacts[ti] < 0.01) //. shape factor can not be this small,
     {
-      t_shapeFacts[ti] = std::max(randomG(), 0.01);
+      t_shapeFacts[ti] = randomG();
       nBelowAllowedG += tr.CrosArea.norm();
     }
 

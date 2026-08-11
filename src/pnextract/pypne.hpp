@@ -35,20 +35,23 @@ inline bool writeToFile(const std::string &filename,
   return false;
 }
 
-inline double
-randomG() /// to randomly distribute the shape factors, in case of errors
-{
-  double x1, x2, w, y;
-  do {
-    x1 = 2. * rand() / RAND_MAX - 1.;
-    x2 = 2. * rand() / RAND_MAX - 1.;
-    w = x1 * x1 + x2 * x2;
-  } while (w >= 1.);
-  w = sqrt((-2. * log(w)) / w);
-  y = 0.00625 * (x1 * w + 5.);
-  if (y > 0.049)
-    y = 0.0625;
-  return y;
+inline double randomG(std::mt19937 &rng) { /// to randomly distribute the shape
+                                           /// factors, in case of errors
+  // Box-Muller for standard normal distribution N(0,1)
+  // original code: y = 0.00625 * (x1 * w + 5.0)
+  //       = 0.00625 * x1*w  +  0.03125
+  // where x1*w ~ N(0,1), then:
+  //   mean = 0.03125, stddev = 0.00625
+  static std::normal_distribution<double> dist(0.03125, 0.00625);
+
+  double y = dist(rng);
+
+  return (y > 0.049) ? 0.0625 : std::max(y, 0.01);
+}
+
+inline double randomG() {
+  thread_local std::mt19937 rng{42};
+  return randomG(rng);
 }
 
 class blockNetwork;
