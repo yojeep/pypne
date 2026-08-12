@@ -101,6 +101,10 @@ def pnextract(
     RCorsn=abs(_minRp);
     output_path : path to output file, using default value "./pn(with desired suffix)"
     """
+    assert image.ndim == 3, "image must be 3D"
+    assert resolution > 0, "resolution must be positive"
+    assert image.itemsize == 1, f"8-bit image required, got itemsize={image.itemsize}"
+
     cfg = asdict(PnConfig())
 
     if config_settings:
