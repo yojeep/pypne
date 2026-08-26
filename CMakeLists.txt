@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 4.2)
 # set(CMAKE_C_COMPILER clang)
-set(CMAKE_CXX_COMPILER clang++)
-# set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
+# set(CMAKE_CXX_COMPILER clang++)
+set(CMAKE_CXX_COMPILER "g++") # only support g++ or MinGW-w64
 
 project(pypne_project LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)

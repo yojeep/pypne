@@ -2,11 +2,11 @@
 name = "pypne"
 version = "0.1.0"
 dependencies = ["numpy"]
-authors = [{ name = "Jinping Yang", email = "12227053@zju.edu.cn" }]
+authors = [{ name = "Jinping Yang", email = "1379690602@qq.com" }]
 description = "Python package for network extraction"
 keywords = ["pore-network", "network-extraction"]
-requires-python = ">=3.13,<3.14"
-# requires-python = ">=3.9"
+# requires-python = ">=3.13,<3.14"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: C++",
